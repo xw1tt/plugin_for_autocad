@@ -43,6 +43,9 @@ namespace Slt.Core
                 case "axis": return new Axis();
                 case "axes": return new AxisGrid();
                 case "format": return new SheetFormat();
+                case "kip": return new Instrument();
+                case "sym": return new Symbol();
+                case "list": return new PosList();
                 default: throw new ArgumentException("Неизвестный объект: " + kind);
             }
         }

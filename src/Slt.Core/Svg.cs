@@ -26,7 +26,7 @@ namespace Slt.Core
                     case ShapeKind.Circle: sb.Append($"<circle cx=\"{F(s.Pts[0].X)}\" cy=\"{F(s.Pts[0].Y)}\" r=\"{F(s.R)}\" stroke-width=\"{F(sw)}\"/>"); break;
                     case ShapeKind.Arc:
                         var c = s.Pts[0];
-                        sb.Append($"<path d=\"M{F(c.X + s.R * Math.Cos(s.A0))} {F(c.Y + s.R * Math.Sin(s.A0))} A{F(s.R)} {F(s.R)} 0 {((s.A1 - s.A0) % (2 * Math.PI) > Math.PI ? 1 : 0)} 1 {F(c.X + s.R * Math.Cos(s.A1))} {F(c.Y + s.R * Math.Sin(s.A1))}\" stroke-width=\"{F(sw)}\"/>");
+                        sb.Append($"<path d=\"M{F(c.X + s.R * Math.Cos(s.A0))} {F(c.Y + s.R * Math.Sin(s.A0))} A{F(s.R)} {F(s.R)} 0 {((((s.A1 - s.A0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI) > Math.PI ? 1 : 0)} 1 {F(c.X + s.R * Math.Cos(s.A1))} {F(c.Y + s.R * Math.Sin(s.A1))}\" stroke-width=\"{F(sw)}\"/>");
                         break;
                     case ShapeKind.Text:
                         var p = s.Pts[0];

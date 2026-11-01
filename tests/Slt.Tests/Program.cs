@@ -79,5 +79,46 @@ Eq("форма 6 без «листов»", "", sheets[1].Field("sheets"));
 var f = new SheetFormat(); f.Fields["object"] = new string('Ж', 700);
 Eq("длинное поле", 700, ((SheetFormat)Smart.From(f.SaveAll())).Field("object").Length);
 
+// Библиотека
+var lib = Library.Default();
+Eq("библиотека без ошибок", "", string.Join("; ", lib.Errors));
+True("символов > 30", lib.Symbols.Count > 30);
+var user = Library.Default(); user.Parse("[Моё]\n= vent.damper | Заслонка моя |\nC 0 0 2", "польз.");
+Eq("замена по id", "Заслонка моя", user.Get("vent.damper").Name);
+Eq("одна заслонка", 1, user.Symbols.Count(x => x.Id == "vent.damper"));
+var bad = new Library(); bad.Parse("= x | X\nQ 1 2", "t");
+Eq("ошибка строки", 1, bad.Errors.Count);
+foreach (var kind in new[] { "kip", "sym", "list" })
+{
+    var o = Smart.Create(kind); var back = Smart.From(o.SaveAll());
+    Eq("сохранение " + kind, string.Join(";", o.SaveAll().OrderBy(x => x.Key).Select(x => x.Key + "=" + x.Value)), string.Join(";", back.SaveAll().OrderBy(x => x.Key).Select(x => x.Key + "=" + x.Value)));
+}
+
+// КИП
+var te = new Instrument { Pos = "TE1", K = 100 };
+var edge = te.Edge(new P2(0, -1000));
+Eq("контур снизу", -500.0, Math.Round(edge.Y, 3));
+var wide = new Instrument { Pos = "DPSZ12345" };
+True("длинный текст — шире окружности", wide.Edge(new P2(1, 0)).X > 5.01);
+var pi = new Instrument { Form = KipShape.Panel, Pos = "TIC7" };
+True("на щите — две строки", pi.Shapes().Count(s => s.Kind == ShapeKind.Text) == 2);
+var mv = new Instrument { Tap = new P2(0, -15), RefAt = new P2(0, 15), HasRef = true };
+var sh = mv.MoveGrip(0, new P2(2, 3));
+Eq("центр: отбор на месте", "(0; -15)", (mv.Tap + sh).ToString());
+Eq("расшифровка TE", "температура; чувствительный элемент (первичное преобразование)", KipLetters.Explain("TE10"));
+Eq("расшифровка PDT", "давление, разрежение; разность, перепад; преобразование, дистанционная передача", KipLetters.Explain("PDT1"));
+True("расшифровка DPS", KipLetters.Explain("DPS3").StartsWith("перепад: давление"));
+Eq("кириллица", "температура; показание", KipLetters.Explain("ТI1"));
+
+// Перечень
+Eq("диапазон", "Y1–Y3", PosList.Join(new List<string> { "Y1", "Y2", "Y3" }));
+Eq("два — через запятую", "DPS1, DPS2", PosList.Join(new List<string> { "DPS1", "DPS2" }));
+Eq("с разрывом", "TE1, TE3, TE4", PosList.Join(new List<string> { "TE1", "TE3", "TE4" }));
+var rows = PosList.Compose(new[] { new PosItem("TE10", "Датчик", 1), new PosItem("TE2", "Датчик", 1), new PosItem("Y1", "Привод", 2), new PosItem("", "Кабель", 30) });
+Eq("строк", 3, rows.Count);
+Eq("порядок естественный", "TE2, TE10", rows[0][0]);
+Eq("кол-во", "2", rows[1][2]);
+Eq("без позиции — в конце", "Кабель", rows[2][1]);
+
 Console.WriteLine($"Проверок: {total}, провалено: {fails}");
 return fails == 0 ? 0 : 1;

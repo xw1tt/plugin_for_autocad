@@ -9,4 +9,7 @@
   <ItemGroup Condition="'$(TargetFramework)' == 'net46'">
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="library.txt" LogicalName="Slt.Core.library.txt" />
+  </ItemGroup>
 </Project>

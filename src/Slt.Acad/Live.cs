@@ -178,6 +178,7 @@ namespace Slt.Acad
         readonly Action<Smart, Point3d> update;
         readonly Point3d? basePoint;
         public Point3d Origin;
+        public Point3d Last => last;
         Point3d last = new Point3d(double.NaN, 0, 0);
 
         public SmartJig(Smart o, string prompt, Point3d origin, Action<Smart, Point3d> update, Point3d? basePoint = null)
@@ -188,7 +189,8 @@ namespace Slt.Acad
             var o = new JigPromptPointOptions("\n" + prompt) { UserInputControls = UserInputControls.Accept3dCoordinates | UserInputControls.NullResponseAccepted };
             if (basePoint.HasValue) { o.UseBasePoint = true; o.BasePoint = basePoint.Value; o.Cursor = CursorType.RubberBand; }
             var r = prompts.AcquirePoint(o);
-            if (r.Status != PromptStatus.OK) return SamplerStatus.Cancel;
+            if (r.Status == PromptStatus.Cancel) return SamplerStatus.Cancel;
+            if (r.Status != PromptStatus.OK) return SamplerStatus.NoChange;
             if (r.Value.IsEqualTo(last)) return SamplerStatus.NoChange;
             last = r.Value;
             update(obj, r.Value);

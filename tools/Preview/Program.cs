@@ -39,6 +39,45 @@ f6.Fields["code"] = f.Fields["code"];
 SheetFormat.Number(new[] { f, f6 });
 File.WriteAllText(Path.Combine(dir, "format-a3.svg"), Svg.Document(420, 297, Svg.Group(f.Shapes(), 0, 297), 3));
 File.WriteAllText(Path.Combine(dir, "format-a4-form6.svg"), Svg.Document(210, 297, Svg.Group(f6.Shapes(), 0, 297), 3));
+// Лист 4: библиотека символов — таблица.
+var lib = Library.Current;
+foreach (var e in lib.Errors) Console.WriteLine("ОШИБКА библиотеки: " + e);
+var lb = new StringBuilder(); int col = 0; double ly = 15; string grp = null;
+foreach (var d in lib.Symbols)
+{
+    if (d.Group != grp) { if (col != 0) { ly += 30; col = 0; } grp = d.Group; lb.Append($"<text x=\"5\" y=\"{ly - 7}\" font-size=\"4\" font-family=\"Arial\" font-weight=\"bold\">{grp}</text>"); }
+    double x = 18 + col * 34; if (d.Bounds()[3] > 9) ly += 0;
+    var sy = new Symbol { Sym = d.Id, Pos = d.Prefix == "" ? "" : d.Prefix + "1" }; sy.PosAt = sy.DefaultPosAt(); lb.Append(Svg.Group(sy.Shapes(), x, ly + 4));
+    lb.Append($"<text x=\"{x}\" y=\"{ly + 16}\" font-size=\"2.2\" font-family=\"Arial\" text-anchor=\"middle\" fill=\"#06c\">{System.Security.SecurityElement.Escape(d.Name.Length > 26 ? d.Name.Substring(0, 25) + "…" : d.Name)}</text>");
+    if (++col == 6) { col = 0; ly += 30; }
+}
+File.WriteAllText(Path.Combine(dir, "library.svg"), Svg.Document(210, ly + 30, lb.ToString()));
+
+// Лист 5: фрагмент схемы автоматизации в стиле проекта СУДИО + перечень.
+var sb = new StringBuilder();
+void L(double x1, double y1, double x2, double y2) => sb.Append(Svg.Group(new List<Shape> { new Shape { Kind = ShapeKind.Line, Pts = new[] { new P2(x1, y1), new P2(x2, y2) }, Weight = Weight.Thick } }, 0, 0));
+void Pt(Smart o, double x, double y) => sb.Append(Svg.Group(o.Shapes(), x, -y));
+double Y = -60;
+L(20, Y, 230, Y);
+Pt(new Symbol { Sym = "vent.flow", Angle = 0 }, 20, Y);
+Pt(new Instrument { Pos = "TE1", Tap = new P2(0, -14), HasRef = true, Ref = "1", RefAt = new P2(0, 18) }, 40, Y + 14);
+Pt(new Symbol { Sym = "vent.damper", Pos = "Y1", PosAt = new P2(0, 4) }, 60, Y);
+Pt(new Instrument { Form = KipShape.Actuator, Pos = "", Inner = "M", Diameter = 6, TapDot = false, Tap = new P2(0, 9), HasRef = true, Ref = "15,22", RefAt = new P2(0, -10) }, 60, Y - 9);
+Pt(new Symbol { Sym = "vent.filter" }, 85, Y);
+Pt(new Instrument { Pos = "DPS1", HasTap = false, HasRef = true, Ref = "25", RefAt = new P2(0, -10) }, 85, Y - 16);
+Pt(new Symbol { Sym = "vent.heater" }, 115, Y);
+Pt(new Instrument { Pos = "TE7", Tap = new P2(0, -14), HasRef = true, Ref = "7", RefAt = new P2(0, 18) }, 140, Y + 14);
+Pt(new Symbol { Sym = "vent.fan", Pos = "M1", PosAt = new P2(0, 7) }, 165, Y);
+Pt(new Instrument { Form = KipShape.Panel, Pos = "TIC7", Tap = new P2(0, -14), HasRef = false }, 190, Y + 14);
+Pt(new Instrument { Form = KipShape.Paz, Pos = "TSZ1", Tap = new P2(0, -14) }, 215, Y + 14);
+Pt(new Symbol { Sym = "vent.flow", Angle = Math.PI }, 233, Y);
+var list = new PosList { Rows = PosList.Compose(new[] {
+    new PosItem("DPS1", "Реле перепада давления DPS-500", 1), new PosItem("DPS2", "Реле перепада давления DPS-500", 1),
+    new PosItem("TE1", "Канальный датчик температуры TS-K250 PRO PT1000", 1), new PosItem("TE3", "Канальный датчик температуры TS-K250 PRO PT1000", 1), new PosItem("TE10", "Канальный датчик температуры TS-K250 PRO PT1000", 1),
+    new PosItem("TE7", "Канальный датчик температуры TS-K250 PRO PT1000", 1),
+    new PosItem("Y1", "Привод воздушной заслонки ODA-15(24)-M-024-N-A", 1), new PosItem("Y2", "Привод воздушной заслонки ODA-15(24)-M-024-N-A", 1), new PosItem("Y3", "Привод воздушной заслонки ODA-15(24)-M-024-N-A", 1) }) };
+Pt(list, 120, -95);
+File.WriteAllText(Path.Combine(dir, "kip.svg"), Svg.Document(250, 165, sb.ToString()));
 Console.WriteLine("ok");
 
 static class Ext { public static T With<T>(this T o, Action<T> a) { a(o); return o; } }

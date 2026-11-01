@@ -30,6 +30,7 @@ namespace Slt.Acad
             try
             {
                 Draw.HookMeasure();
+                UserLibrary.Load();
                 var cls = RXObject.GetClass(typeof(BlockReference));
                 draw = new SmartDraw(); draw.SetXDataFilter(Data.App);
                 grips = new SmartGrips(); grips.SetXDataFilter(Data.App);
