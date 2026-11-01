@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Проверки ядра без зависимостей: dotnet run — код возврата 0, если всё прошло. -->
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><OutputType>Exe</OutputType><Nullable>disable</Nullable></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/Slt.Core/Slt.Core.csproj" /></ItemGroup>
+</Project>

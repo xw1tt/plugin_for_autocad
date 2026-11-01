@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Превью объектов оформления (SVG) для сверки с ГОСТ: dotnet run, аргументы — папка вывода. -->
+  <PropertyGroup><TargetFramework>net8.0</TargetFramework><OutputType>Exe</OutputType><Nullable>disable</Nullable></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/Slt.Core/Slt.Core.csproj" /></ItemGroup>
+</Project>
