@@ -153,18 +153,24 @@ namespace Slt.Acad
         [Category("3. Перечень"), DisplayName("Наименование"), Description("Для перечня элементов: «Канальный датчик температуры TS-K250 PRO PT1000».")] public string Name { get; set; }
         [Category("3. Перечень"), DisplayName("Количество")] public double Qty { get; set; }
         [Category("3. Перечень"), DisplayName("Примечание")] public string Note { get; set; }
+        [Category("3. Перечень"), DisplayName("Тип, марка (спецификация)"), Description("Графа 3 спецификации: TS-K250 PRO PT1000.")] public string Type { get; set; }
+        [Category("3. Перечень"), DisplayName("Поставщик")] public string Maker { get; set; }
+        [Category("3. Перечень"), DisplayName("Код продукции")] public string Code { get; set; }
+        [Category("3. Перечень"), DisplayName("Ед. измерения")] public string Unit { get; set; }
+        [Category("3. Перечень"), DisplayName("Масса 1 ед., кг")] public double Mass { get; set; }
         [Category("4. Вид"), DisplayName("Диаметр, мм"), Description("10 мм — прибор, 6 мм — ИМ.")] public double D { get; set; }
         [Category("4. Вид"), DisplayName("Высота текста, мм")] public double H { get; set; }
         public KipView(Instrument i)
         {
             Pos = i.Pos; Form = (ФормаКИП)(int)i.Form; Inner = i.Inner; Two = i.TwoLines; Tap = i.HasTap; Dot = i.TapDot; HasRef = i.HasRef; Ref = i.Ref;
-            Name = i.Name; Qty = i.Qty; Note = i.Note; D = i.Diameter; H = i.TextH;
+            Name = i.Name; Qty = i.Qty; Note = i.Note; D = i.Diameter; H = i.TextH; Type = i.Type; Maker = i.Maker; Code = i.Code; Unit = i.Unit; Mass = i.Mass;
         }
         public void To(Smart o)
         {
             var i = (Instrument)o;
             i.Pos = (Pos ?? "").Trim(); i.Form = (KipShape)(int)Form; i.Inner = Inner ?? ""; i.TwoLines = Two; i.HasTap = Tap; i.TapDot = Dot; i.HasRef = HasRef; i.Ref = Ref ?? "";
             i.Name = Name ?? ""; i.Qty = Qty; i.Note = Note ?? ""; i.Diameter = Math.Max(3, D); i.TextH = H > 0 ? H : 2.5;
+            i.Type = Type ?? ""; i.Maker = Maker ?? ""; i.Code = Code ?? ""; i.Unit = string.IsNullOrWhiteSpace(Unit) ? "шт." : Unit; i.Mass = Mass;
             if (i.Form == KipShape.Actuator && i.Inner == "") i.Inner = "M";
         }
     }
@@ -178,11 +184,17 @@ namespace Slt.Acad
         [Category("Перечень"), DisplayName("Наименование"), Description("Пусто — наименование символа из библиотеки.")] public string Name { get; set; }
         [Category("Перечень"), DisplayName("Количество")] public double Qty { get; set; }
         [Category("Перечень"), DisplayName("Примечание")] public string Note { get; set; }
+        [Category("Перечень"), DisplayName("Тип, марка (спецификация)")] public string Type { get; set; }
+        [Category("Перечень"), DisplayName("Поставщик")] public string Maker { get; set; }
+        [Category("Перечень"), DisplayName("Код продукции")] public string Code { get; set; }
+        [Category("Перечень"), DisplayName("Ед. измерения")] public string Unit { get; set; }
+        [Category("Перечень"), DisplayName("Масса 1 ед., кг")] public double Mass { get; set; }
         [Category("Вид"), DisplayName("Высота текста, мм")] public double H { get; set; }
-        public SymbolView(Symbol y) { Sym = y.Def?.Name ?? y.Sym; Pos = y.Pos; ShowPos = y.ShowPos; Angle = Math.Round(y.Angle * 180 / Math.PI, 2); Name = y.Name; Qty = y.Qty; Note = y.Note; H = y.TextH; }
+        public SymbolView(Symbol y) { Sym = y.Def?.Name ?? y.Sym; Pos = y.Pos; ShowPos = y.ShowPos; Angle = Math.Round(y.Angle * 180 / Math.PI, 2); Name = y.Name; Qty = y.Qty; Note = y.Note; H = y.TextH; Type = y.Type; Maker = y.Maker; Code = y.Code; Unit = y.Unit; Mass = y.Mass; }
         public void To(Smart o)
         {
             var y = (Symbol)o; y.Pos = (Pos ?? "").Trim(); y.ShowPos = ShowPos; y.Angle = Angle * Math.PI / 180; y.Name = Name ?? ""; y.Qty = Qty; y.Note = Note ?? ""; y.TextH = H > 0 ? H : 2.5;
+            y.Type = Type ?? ""; y.Maker = Maker ?? ""; y.Code = Code ?? ""; y.Unit = string.IsNullOrWhiteSpace(Unit) ? "шт." : Unit; y.Mass = Mass;
         }
     }
 
@@ -195,6 +207,55 @@ namespace Slt.Acad
         [DisplayName("Высота текста, мм")] public double H { get; set; }
         public ListView(PosList l) { Caption = l.Caption; W1 = l.Widths[0]; W2 = l.Widths[1]; W3 = l.Widths[2]; H = l.TextH; }
         public void To(Smart o) { var l = (PosList)o; l.Caption = Caption ?? ""; l.Widths = new[] { Math.Max(10, W1), Math.Max(20, W2), Math.Max(10, W3) }; l.TextH = H > 0 ? H : 2.5; }
+    }
+
+    public sealed class LineKindConverter : StringConverter
+    {
+        public override bool GetStandardValuesSupported(ITypeDescriptorContext c) => true;
+        public override bool GetStandardValuesExclusive(ITypeDescriptorContext c) => true;
+        public override StandardValuesCollection GetStandardValues(ITypeDescriptorContext c) => new StandardValuesCollection(LineKinds.All.Select(k => k.Name).ToArray());
+    }
+
+    public sealed class CableView : IView
+    {
+        [Category("1. Кабель"), DisplayName("Обозначение"), Description("К1, К20… Следующий кабель — номер +1.")] public string Mark { get; set; }
+        [Category("1. Кабель"), DisplayName("Марка кабеля"), Description("КСПЭВПнг(А)-HF 2x2x0,97, UTP 4x2x0,52 cat.5e…")] public string Type { get; set; }
+        [Category("1. Кабель"), DisplayName("Вид линии"), Description("Цвет и толщина — по условным обозначениям линий связи."), TypeConverter(typeof(LineKindConverter))] public string Line { get; set; }
+        [Category("2. Трасса"), DisplayName("Начало"), Description("Пусто — по объекту у начала линии (позиция прибора, шкафа).")] public string From { get; set; }
+        [Category("2. Трасса"), DisplayName("Конец"), Description("Пусто — по объекту у конца линии.")] public string End { get; set; }
+        [Category("2. Трасса"), DisplayName("Запас, %"), Description("К длине по чертежу (в модели).")] public double Reserve { get; set; }
+        [Category("2. Трасса"), DisplayName("Длина вручную, м"), Description("0 — по чертежу (только в модели; на схемах в листах — вручную).")] public double Meters { get; set; }
+        [Category("2. Трасса"), DisplayName("Примечание")] public string Note { get; set; }
+        [Category("3. Подпись"), DisplayName("Показывать обозначение")] public bool ShowMark { get; set; }
+        [Category("3. Подпись"), DisplayName("Показывать марку")] public bool ShowType { get; set; }
+        [Category("3. Подпись"), DisplayName("Высота текста, мм")] public double H { get; set; }
+        public CableView(Cable c) { Mark = c.Mark; Type = c.Type; Line = LineKinds.Get(c.Line).Name; From = c.Start; End = c.To; Reserve = c.Reserve; Meters = c.Meters; Note = c.Note; ShowMark = c.ShowMark; ShowType = c.ShowType; H = c.TextH; }
+        public void To(Smart o)
+        {
+            var c = (Cable)o; c.Mark = (Mark ?? "").Trim(); c.Type = Type ?? ""; c.Line = (LineKinds.All.FirstOrDefault(k => k.Name == Line) ?? LineKinds.All[0]).Id;
+            c.Start = From ?? ""; c.To = End ?? ""; c.Reserve = Math.Max(0, Reserve); c.Meters = Math.Max(0, Meters); c.Note = Note ?? ""; c.ShowMark = ShowMark; c.ShowType = ShowType; c.TextH = H > 0 ? H : 2.5;
+        }
+    }
+
+    public sealed class CaptionView : IView
+    {
+        [DisplayName("Заголовок"), Description("Над таблицей. Пусто — без заголовка.")] public string Caption { get; set; }
+        [DisplayName("Высота текста, мм")] public double H { get; set; }
+        public CaptionView(Journal j) { Caption = j.Caption; H = j.TextH; }
+        public CaptionView(Spec s) { Caption = s.Caption; H = s.TextH; }
+        public void To(Smart o)
+        {
+            if (o is Journal j) { j.Caption = Caption ?? ""; j.TextH = H > 0 ? H : 2.5; }
+            if (o is Spec s) { s.Caption = Caption ?? ""; s.TextH = H > 0 ? H : 2.5; }
+        }
+    }
+
+    public sealed class LegendView : IView
+    {
+        [DisplayName("Виды линий"), Description("Через запятую: " + "an — аналоговые/дискретные, rs485, eth — Ethernet, ecat — EtherCAT, fo — ВОЛС, knx, pwr — питание, dash — штриховая.")] public string Kinds { get; set; }
+        [DisplayName("Высота текста, мм")] public double H { get; set; }
+        public LegendView(LineLegend l) { Kinds = l.Kinds; H = l.TextH; }
+        public void To(Smart o) { var l = (LineLegend)o; l.Kinds = Kinds ?? ""; l.TextH = H > 0 ? H : 2.5; }
     }
 
     public static class Dialogs
@@ -212,6 +273,10 @@ namespace Slt.Acad
                 case Instrument i: return new KipView(i);
                 case Symbol y: return new SymbolView(y);
                 case PosList pl: return new ListView(pl);
+                case Cable c: return new CableView(c);
+                case Journal j: return new CaptionView(j);
+                case Spec sp: return new CaptionView(sp);
+                case LineLegend lg: return new LegendView(lg);
             }
             return null;
         }
@@ -219,6 +284,7 @@ namespace Slt.Acad
         /// <summary>Окно свойств; true — применить.</summary>
         public static bool Edit(Smart o)
         {
+            if (o is FsaTable ft) return FsaDialog.Edit(ft);
             var view = ViewOf(o);
             if (view == null) return false;
             using (var form = new Form

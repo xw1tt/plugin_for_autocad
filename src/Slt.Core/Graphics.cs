@@ -37,6 +37,8 @@ namespace Slt.Core
         public VAlign Va;
         public double Rotation;
         public Weight Weight = Weight.Thin;
+        /// <summary>Цвет ACI; 0 — по блоку (цвет объекта).</summary>
+        public int Color;
     }
 
     /// <summary>Построитель: размеры задаются в мм листа и умножаются на k — единиц чертежа в 1 мм листа.</summary>

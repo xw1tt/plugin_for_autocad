@@ -35,7 +35,7 @@ namespace Slt.Acad
                 {
                     using (e)
                     {
-                        if (owner != null) { e.Color = owner.Color; e.LayerId = owner.LayerId; }
+                        if (owner != null) { if (e.Color.IsByBlock) e.Color = owner.Color; e.LayerId = owner.LayerId; }
                         if (e is DBText t && db != null && (t.HorizontalMode != TextHorizontalMode.TextLeft || t.VerticalMode != TextVerticalMode.TextBase)) t.AdjustAlignment(db);
                         g.Draw(e);
                     }

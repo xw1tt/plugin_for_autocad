@@ -46,6 +46,11 @@ namespace Slt.Core
                 case "kip": return new Instrument();
                 case "sym": return new Symbol();
                 case "list": return new PosList();
+                case "cable": return new Cable();
+                case "journal": return new Journal();
+                case "spec": return new Spec();
+                case "fsa": return new FsaTable();
+                case "legend": return new LineLegend();
                 default: throw new ArgumentException("Неизвестный объект: " + kind);
             }
         }

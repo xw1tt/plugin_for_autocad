@@ -23,7 +23,8 @@ namespace Slt.Core
         public bool HasTap = true, TapDot = true, HasRef;
         public P2 Tap = new P2(0, -15), RefAt = new P2(0, 15), PosAt = new P2(-6, 6); // единицы чертежа
         public string Name = "", Note = "";
-        public double Qty = 1;
+        public string Type = "", Maker = "", Code = "", Unit = "шт.";
+        public double Qty = 1, Mass;
         public double Diameter = 10, TextH = 2.5;
 
         public override string Kind => "kip";
@@ -160,7 +161,7 @@ namespace Slt.Core
         {
             { "shape", Form.ToString() }, { "pos", Pos }, { "inner", Inner }, { "two", TwoLines ? "1" : "0" }, { "ref", Ref },
             { "hastap", HasTap ? "1" : "0" }, { "dot", TapDot ? "1" : "0" }, { "hasref", HasRef ? "1" : "0" },
-            { "pts", Pts(new[] { Tap, RefAt, PosAt }) }, { "name", Name }, { "note", Note }, { "qty", F(Qty) }, { "d", F(Diameter) }, { "h", F(TextH) },
+            { "pts", Pts(new[] { Tap, RefAt, PosAt }) }, { "name", Name }, { "note", Note }, { "qty", F(Qty) }, { "d", F(Diameter) }, { "type", Type }, { "maker", Maker }, { "code", Code }, { "unit", Unit }, { "mass", F(Mass) }, { "h", F(TextH) },
         };
 
         public override void Load(IDictionary<string, string> d)
@@ -169,7 +170,7 @@ namespace Slt.Core
             Pos = S(d, "pos"); Inner = S(d, "inner"); TwoLines = B(d, "two", false); Ref = S(d, "ref");
             HasTap = B(d, "hastap", true); TapDot = B(d, "dot", true); HasRef = B(d, "hasref", false);
             var p = Pts(S(d, "pts")); if (p.Count >= 3) { Tap = p[0]; RefAt = p[1]; PosAt = p[2]; }
-            Name = S(d, "name"); Note = S(d, "note"); Qty = D(d, "qty", 1); Diameter = D(d, "d", 10); TextH = D(d, "h", 2.5);
+            Name = S(d, "name"); Note = S(d, "note"); Qty = D(d, "qty", 1); Type = S(d, "type"); Maker = S(d, "maker"); Code = S(d, "code"); Unit = S(d, "unit", "шт."); Mass = D(d, "mass", 0); Diameter = D(d, "d", 10); TextH = D(d, "h", 2.5);
         }
 
         /// <summary>Заготовки: датчик по месту, прибор на щите, ИМ.</summary>

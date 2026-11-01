@@ -120,5 +120,52 @@ Eq("порядок естественный", "TE2, TE10", rows[0][0]);
 Eq("кол-во", "2", rows[1][2]);
 Eq("без позиции — в конце", "Кабель", rows[2][1]);
 
+// Кабели
+var cb = new Cable { Path = new List<P2> { new P2(0, 0), new P2(3000, 0), new P2(3000, 4000) } };
+Eq("длина по чертежу, м", 7.0, cb.Length(1));
+cb.Reserve = 10; Eq("с запасом 10% вверх до метра", 8.0, cb.Length(1));
+cb.Meters = 12; Eq("вручную", 12.0, cb.Length(1));
+Eq("на листе без ручной — 0", 0.0, new Cable().Length(0));
+var dashed = new Cable { Line = "pwr", ShowMark = false, Path = new List<P2> { new P2(0, 0), new P2(100, 0) } };
+True("штриховая — много отрезков", dashed.Shapes().Count(x => x.Kind == ShapeKind.Line) >= 8);
+True("Ethernet — красный", new Cable { Line = "eth" }.Shapes().First().Color == 1);
+var lbl = new Cable { Mark = "К5", Path = new List<P2> { new P2(0, 0), new P2(-50, 0) } }.Shapes().First(x => x.Kind == ShapeKind.Text);
+Eq("подпись не вверх ногами", 0.0, Math.Round(lbl.Rotation, 6));
+foreach (var kind in new[] { "cable", "journal", "spec", "fsa", "legend" })
+{
+    var o = Smart.Create(kind); var back = Smart.From(o.SaveAll());
+    Eq("сохранение " + kind, string.Join(";", o.SaveAll().OrderBy(x => x.Key).Select(x => x.Key + "=" + x.Value)), string.Join(";", back.SaveAll().OrderBy(x => x.Key).Select(x => x.Key + "=" + x.Value)));
+    True("рисуется " + kind, back.Shapes().Count > 0);
+}
+var jrows = Journal.Compose(new[] { new JournalItem { Mark = "К10", Meters = 5 }, new JournalItem { Mark = "К2", Meters = 7.5 } });
+Eq("журнал по порядку", "К2", jrows[0][0]);
+Eq("длина с запятой", "7,5", jrows[0][4]);
+
+// Спецификация
+var srows = Spec.Compose(new[] {
+    new SpecItem { Section = "Кабельная продукция", Name = "Кабель", Type = "UTP", Unit = "м", Qty = 10 },
+    new SpecItem { Section = "Приборы и средства автоматизации", Pos = "TE2", Name = "Датчик", Type = "TS" },
+    new SpecItem { Section = "Приборы и средства автоматизации", Pos = "TE1", Name = "Датчик", Type = "TS" },
+    new SpecItem { Section = "Кабельная продукция", Name = "Кабель", Type = "UTP", Unit = "м", Qty = 15 } });
+Eq("раздел приборов первым", "Приборы и средства автоматизации", srows[0][0]);
+Eq("позиции", "TE1, TE2", srows[1][0]);
+Eq("кол-во датчиков", "2", srows[1][6]);
+Eq("кабель суммой", "25", srows[3][6]);
+
+// Таблица ФСА: синхронизация
+var ft = new FsaTable();
+ft.Columns.Add(new FsaColumn { Num = "1", Text = "a" });
+ft.Columns.Add(new FsaColumn { Num = "5", Text = "b" });
+var k1 = new Instrument { Pos = "TE1", Ref = "5", Name = "T" };
+var k2 = new Instrument { Pos = "Y1", Ref = "3,7", Form = KipShape.Actuator, Name = "Привод" };
+ft.Sync(new[] { k1, k2 });
+Eq("граф после синхронизации", 4, ft.Columns.Count);
+Eq("нумерация подряд", "1,2,3,4", string.Join(",", ft.Columns.Select(c => c.Num)));
+Eq("ссылка прибора 5→3", "3", k1.Ref);
+Eq("ссылка ИМ 3,7→2,4", "2,4", k2.Ref);
+True("ИМ — управление", ft.Columns[1].Marks.Contains("Управление"));
+var fb = (FsaTable)Smart.From(ft.SaveAll());
+Eq("ФСА сохраняет графы", "1|a|2|Привод|3|b|4|Привод", string.Join("|", fb.Columns.Select(c => c.Num + "|" + c.Text)));
+
 Console.WriteLine($"Проверок: {total}, провалено: {fails}");
 return fails == 0 ? 0 : 1;

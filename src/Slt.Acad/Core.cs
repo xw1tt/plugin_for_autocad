@@ -22,40 +22,84 @@ namespace Slt.Acad
 
         public static bool IsSmart(DBObject o) => o is BlockReference && o.GetXDataForApplication(App) != null;
 
-        /// <summary>Параметры из XData: строки «ключ=значение»; длинные значения — продолжениями «+ключ=часть».</summary>
-        public static Dictionary<string, string> Read(DBObject o)
-        {
-            var d = new Dictionary<string, string>();
-            var rb = o.GetXDataForApplication(App);
-            if (rb == null) return d;
-            foreach (var tv in rb.AsArray().Skip(1))
-            {
-                if (!(tv.Value is string s)) continue;
-                var cont = s.StartsWith("+");
-                var eq = s.IndexOf('=');
-                if (eq <= 0) continue;
-                var k = s.Substring(cont ? 1 : 0, eq - (cont ? 1 : 0)); var v = s.Substring(eq + 1);
-                d[k] = cont && d.TryGetValue(k, out var prev) ? prev + v : v;
-            }
-            return d;
-        }
+        const string Ext = "SLT_DATA";
+        const int Chunk = 100;            // символов в одной строке XData (ограничение 255 байт)
+        const int XDataLimit = 4000;      // больше — в словарь расширений (XData ограничена 16 КБ)
 
-        public static void Write(Entity e, IDictionary<string, string> d)
+        static IEnumerable<string> Lines(IDictionary<string, string> d)
         {
-            var list = new List<TypedValue> { new TypedValue((int)DxfCode.ExtendedDataRegAppName, App) };
             foreach (var kv in d)
             {
                 var v = kv.Value ?? "";
                 int part = 0;
                 do
                 {
-                    var chunk = v.Length > 200 ? v.Substring(0, 200) : v;
-                    list.Add(new TypedValue((int)DxfCode.ExtendedDataAsciiString, (part == 0 ? "" : "+") + kv.Key + "=" + chunk));
-                    v = v.Length > 200 ? v.Substring(200) : "";
+                    var chunk = v.Length > Chunk ? v.Substring(0, Chunk) : v;
+                    yield return (part == 0 ? "" : "+") + kv.Key + "=" + chunk;
+                    v = v.Length > Chunk ? v.Substring(Chunk) : "";
                     part++;
                 } while (v.Length > 0);
             }
-            e.XData = new ResultBuffer(list.ToArray());
+        }
+
+        static void Parse(IEnumerable<string> lines, Dictionary<string, string> d)
+        {
+            foreach (var s in lines)
+            {
+                var cont = s.StartsWith("+");
+                var eq = s.IndexOf('=');
+                if (eq <= 0) continue;
+                var k = s.Substring(cont ? 1 : 0, eq - (cont ? 1 : 0)); var v = s.Substring(eq + 1);
+                d[k] = cont && d.TryGetValue(k, out var prev) ? prev + v : v;
+            }
+        }
+
+        /// <summary>Параметры: XData «ключ=значение» (длинные — продолжениями «+ключ=часть»); большие таблицы — в словаре расширений.</summary>
+        public static Dictionary<string, string> Read(DBObject o)
+        {
+            var d = new Dictionary<string, string>();
+            var rb = o.GetXDataForApplication(App);
+            if (rb == null) return d;
+            Parse(rb.AsArray().Skip(1).Select(tv => tv.Value as string).Where(x => x != null), d);
+            if (d.TryGetValue("ext", out var ext) && ext == "1" && !o.ExtensionDictionary.IsNull)
+            {
+                using (var tr = o.ExtensionDictionary.Database.TransactionManager.StartOpenCloseTransaction())
+                {
+                    var dict = (DBDictionary)tr.GetObject(o.ExtensionDictionary, OpenMode.ForRead);
+                    if (dict.Contains(Ext) && tr.GetObject(dict.GetAt(Ext), OpenMode.ForRead) is Xrecord xr && xr.Data != null)
+                        Parse(xr.Data.AsArray().Select(tv => tv.Value as string).Where(x => x != null), d);
+                }
+                d.Remove("ext");
+            }
+            return d;
+        }
+
+        public static void Write(Entity e, IDictionary<string, string> d)
+        {
+            var lines = Lines(d).ToList();
+            var big = lines.Sum(l => l.Length) > XDataLimit && e.Database != null && !e.ObjectId.IsNull;
+            if (big)
+            {
+                // В XData — только вид и масштаб (для фильтра и копирования), остальное — Xrecord.
+                var head = new Dictionary<string, string> { { "kind", d.TryGetValue("kind", out var k) ? k : "" }, { "k", d.TryGetValue("k", out var kk) ? kk : "1" }, { "ext", "1" } };
+                e.XData = new ResultBuffer(new[] { new TypedValue((int)DxfCode.ExtendedDataRegAppName, App) }.Concat(Lines(head).Select(l => new TypedValue((int)DxfCode.ExtendedDataAsciiString, l))).ToArray());
+                if (e.ExtensionDictionary.IsNull) { if (!e.IsWriteEnabled) e.UpgradeOpen(); e.CreateExtensionDictionary(); }
+                var tm = e.Database.TransactionManager;
+                var tr = tm.TopTransaction;
+                bool own = tr == null;
+                if (own) tr = tm.StartTransaction();
+                try
+                {
+                    var dict = (DBDictionary)tr.GetObject(e.ExtensionDictionary, OpenMode.ForWrite);
+                    var data = new ResultBuffer(lines.Select(l => new TypedValue((int)DxfCode.Text, l)).ToArray());
+                    if (dict.Contains(Ext)) ((Xrecord)tr.GetObject(dict.GetAt(Ext), OpenMode.ForWrite)).Data = data;
+                    else { var xr = new Xrecord { Data = data }; dict.SetAt(Ext, xr); tr.AddNewlyCreatedDBObject(xr, true); }
+                    if (own) tr.Commit();
+                }
+                finally { if (own) tr.Dispose(); }
+                return;
+            }
+            e.XData = new ResultBuffer(new[] { new TypedValue((int)DxfCode.ExtendedDataRegAppName, App) }.Concat(lines.Select(l => new TypedValue((int)DxfCode.ExtendedDataAsciiString, l))).ToArray());
         }
 
         public static void EnsureApp(Transaction tr, Database db)
@@ -180,35 +224,42 @@ namespace Slt.Acad
         public static IEnumerable<Entity> Entities(IEnumerable<Shape> shapes, ObjectId style)
         {
             foreach (var s in shapes)
-            {
-                switch (s.Kind)
+                foreach (var e in One(s, style))
                 {
-                    case ShapeKind.Line: yield return new Line(P(s.Pts[0]), P(s.Pts[1])) { LineWeight = Lw(s.Weight) }; break;
-                    case ShapeKind.Polyline:
-                        var pl = new Polyline(s.Pts.Length) { Closed = s.Closed, LineWeight = Lw(s.Weight) };
-                        for (int i = 0; i < s.Pts.Length; i++) pl.AddVertexAt(i, new Point2d(s.Pts[i].X, s.Pts[i].Y), 0, 0, 0);
-                        yield return pl;
-                        break;
-                    case ShapeKind.Circle: yield return new Circle(P(s.Pts[0]), Vector3d.ZAxis, s.R) { LineWeight = Lw(s.Weight) }; break;
-                    case ShapeKind.Arc: yield return new Arc(P(s.Pts[0]), s.R, s.A0, s.A1) { LineWeight = Lw(s.Weight) }; break;
-                    case ShapeKind.Fill:
-                        for (int i = 1; i + 1 < s.Pts.Length; i++) yield return new Solid(P(s.Pts[0]), P(s.Pts[i]), P(s.Pts[i + 1]));
-                        break;
-                    case ShapeKind.Text:
-                        var t = new DBText { TextString = s.Text, Height = s.H, Rotation = s.Rotation };
-                        if (!style.IsNull) t.TextStyleId = style;
-                        var at = P(s.Pts[0]);
-                        if (s.Ha == HAlign.Left && s.Va == VAlign.Bottom) t.Position = at;
-                        else
-                        {
-                            t.HorizontalMode = s.Ha == HAlign.Left ? TextHorizontalMode.TextLeft : s.Ha == HAlign.Center ? TextHorizontalMode.TextCenter : TextHorizontalMode.TextRight;
-                            t.VerticalMode = s.Va == VAlign.Bottom ? TextVerticalMode.TextBottom : s.Va == VAlign.Middle ? TextVerticalMode.TextVerticalMid : TextVerticalMode.TextTop;
-                            t.Position = at;
-                            t.AlignmentPoint = at;
-                        }
-                        yield return t;
-                        break;
+                    e.Color = s.Color == 0 ? Color.FromColorIndex(ColorMethod.ByBlock, 0) : Color.FromColorIndex(ColorMethod.ByAci, (short)s.Color);
+                    yield return e;
                 }
+        }
+
+        static IEnumerable<Entity> One(Shape s, ObjectId style)
+        {
+            switch (s.Kind)
+            {
+                case ShapeKind.Line: yield return new Line(P(s.Pts[0]), P(s.Pts[1])) { LineWeight = Lw(s.Weight) }; break;
+                case ShapeKind.Polyline:
+                    var pl = new Polyline(s.Pts.Length) { Closed = s.Closed, LineWeight = Lw(s.Weight) };
+                    for (int i = 0; i < s.Pts.Length; i++) pl.AddVertexAt(i, new Point2d(s.Pts[i].X, s.Pts[i].Y), 0, 0, 0);
+                    yield return pl;
+                    break;
+                case ShapeKind.Circle: yield return new Circle(P(s.Pts[0]), Vector3d.ZAxis, s.R) { LineWeight = Lw(s.Weight) }; break;
+                case ShapeKind.Arc: yield return new Arc(P(s.Pts[0]), s.R, s.A0, s.A1) { LineWeight = Lw(s.Weight) }; break;
+                case ShapeKind.Fill:
+                    for (int i = 1; i + 1 < s.Pts.Length; i++) yield return new Solid(P(s.Pts[0]), P(s.Pts[i]), P(s.Pts[i + 1]));
+                    break;
+                case ShapeKind.Text:
+                    var t = new DBText { TextString = s.Text, Height = s.H, Rotation = s.Rotation };
+                    if (!style.IsNull) t.TextStyleId = style;
+                    var at = P(s.Pts[0]);
+                    if (s.Ha == HAlign.Left && s.Va == VAlign.Bottom) t.Position = at;
+                    else
+                    {
+                        t.HorizontalMode = s.Ha == HAlign.Left ? TextHorizontalMode.TextLeft : s.Ha == HAlign.Center ? TextHorizontalMode.TextCenter : TextHorizontalMode.TextRight;
+                        t.VerticalMode = s.Va == VAlign.Bottom ? TextVerticalMode.TextBottom : s.Va == VAlign.Middle ? TextVerticalMode.TextVerticalMid : TextVerticalMode.TextTop;
+                        t.Position = at;
+                        t.AlignmentPoint = at;
+                    }
+                    yield return t;
+                    break;
             }
         }
     }
@@ -259,9 +310,10 @@ namespace Slt.Acad
             var style = Draw.Style(tr, db);
             foreach (var e in Draw.Entities(o.Shapes(), style))
             {
+                var col = e.Color; var lw = e.LineWeight;
                 e.SetDatabaseDefaults(db);
+                e.Color = col; e.LineWeight = lw;
                 e.Layer = "0";
-                e.Color = Color.FromColorIndex(ColorMethod.ByBlock, 0);
                 if (e is DBText t) { t.TextStyleId = style; if (t.HorizontalMode != TextHorizontalMode.TextLeft || t.VerticalMode != TextVerticalMode.TextBase) t.AdjustAlignment(db); }
                 btr.AppendEntity(e);
                 tr.AddNewlyCreatedDBObject(e, true);

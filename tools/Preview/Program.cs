@@ -78,6 +78,37 @@ var list = new PosList { Rows = PosList.Compose(new[] {
     new PosItem("Y1", "Привод воздушной заслонки ODA-15(24)-M-024-N-A", 1), new PosItem("Y2", "Привод воздушной заслонки ODA-15(24)-M-024-N-A", 1), new PosItem("Y3", "Привод воздушной заслонки ODA-15(24)-M-024-N-A", 1) }) };
 Pt(list, 120, -95);
 File.WriteAllText(Path.Combine(dir, "kip.svg"), Svg.Document(250, 165, sb.ToString()));
+// Лист 6: таблица ФСА, линии связи, журнал, спецификация.
+var t = new StringBuilder();
+var fsa = new FsaTable();
+string[][] cols = {
+    new[] { "1", "Температура наружного воздуха Pt1000, -50…+120°С", "Концентраторы IOL-AI8T-M12 x2", "Измерение,IO-Link,EtherCAT" },
+    new[] { "2", "Температура воздуха до рекуператора Pt1000", "Концентраторы IOL-AI8T-M12 x2", "Измерение,IO-Link,EtherCAT" },
+    new[] { "3", "Температура воздуха после рекуператора Pt1000", "Концентраторы IOL-AI8T-M12 x2", "Измерение,IO-Link,EtherCAT" },
+    new[] { "4", "Температура обратной воды 1 подогрев", "Концентраторы IOL-AI8T-M12 x2", "Измерение,IO-Link,EtherCAT" },
+    new[] { "5", "Относит. влажность приточного воздуха 0-10В", "Концентратор IOL-AI8U-M12", "Измерение,IO-Link,EtherCAT" },
+    new[] { "6", "Перепад давления на прит. вент. 0…1000 Па", "Концентратор IOL-AI8U-M12", "Измерение,IO-Link,EtherCAT" },
+    new[] { "7", "Управление приводом заслонки", "", "Управление,Do" },
+    new[] { "8", "Авария ПЧ", "", "Сигнализация,Di,Modbus" } };
+foreach (var c in cols) fsa.Columns.Add(new FsaColumn { Num = c[0], Text = c[1], Equip = c[2], Marks = new HashSet<string>(c[3].Split(',')) });
+t.Append(Svg.Group(fsa.Shapes(), 10, 10));
+var leg = new LineLegend();
+t.Append(Svg.Group(leg.Shapes(), 150, 20));
+var cab = new Cable { Mark = "К20", Type = "КСПЭВПнг(А)-HF 2x2x0,97", ShowType = true, Line = "eth", Path = new List<P2> { new P2(0, 0), new P2(60, 0), new P2(60, -30) } };
+t.Append(Svg.Group(cab.Shapes(), 150, 70));
+var cab2 = new Cable { Mark = "К21", Line = "pwr", Path = new List<P2> { new P2(0, 0), new P2(-40, 25) } };
+t.Append(Svg.Group(cab2.Shapes(), 260, 110));
+var jr = new Journal { Rows = Journal.Compose(new[] {
+    new JournalItem { Mark = "К21", From = "ШУ-ПВ1", To = "TE1", Type = "КСПЭВПнг(А)-HF 2x2x0,97", Meters = 35 },
+    new JournalItem { Mark = "К3", From = "ШУ-ПВ1", To = "Y1", Type = "КСПЭВПнг(А)-HF 2x2x0,97", Meters = 12 } }) };
+t.Append(Svg.Group(jr.Shapes(), 10, 178));
+var sp = new Spec { Rows = Spec.Compose(new[] {
+    new SpecItem { Section = "Приборы и средства автоматизации", Pos = "TE1", Name = "Канальный датчик температуры", Type = "TS-K250 PRO PT1000", Maker = "Регин" },
+    new SpecItem { Section = "Приборы и средства автоматизации", Pos = "TE2", Name = "Канальный датчик температуры", Type = "TS-K250 PRO PT1000", Maker = "Регин" },
+    new SpecItem { Section = "Приборы и средства автоматизации", Pos = "Y1", Name = "Привод воздушной заслонки", Type = "ODA-15(24)-M-024-N-A" },
+    new SpecItem { Section = "Кабельная продукция", Name = "Кабель контрольный", Type = "КСПЭВПнг(А)-HF 2x2x0,97", Unit = "м", Qty = 47 } }) };
+t.Append(Svg.Group(sp.Shapes(), 10, 228));
+File.WriteAllText(Path.Combine(dir, "tables.svg"), Svg.Document(420, 297, t.ToString(), 3));
 Console.WriteLine("ok");
 
 static class Ext { public static T With<T>(this T o, Action<T> a) { a(o); return o; } }

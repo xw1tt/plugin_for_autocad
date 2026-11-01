@@ -146,7 +146,8 @@ namespace Slt.Core
     {
         public string Sym = "vent.damper";
         public string Pos = "", Name = "", Note = "";
-        public double Qty = 1;
+        public string Type = "", Maker = "", Code = "", Unit = "шт.";
+        public double Qty = 1, Mass;
         public double Angle;           // радианы
         public bool ShowPos = true;
         public P2 PosAt = new P2(0, 6); // единицы чертежа; по умолчанию — в мм, команда умножает на K
@@ -180,13 +181,13 @@ namespace Slt.Core
         public override Dictionary<string, string> Save() => new Dictionary<string, string>
         {
             { "sym", Sym }, { "pos", Pos }, { "name", Name }, { "note", Note }, { "qty", F(Qty) }, { "angle", F(Angle) }, { "showpos", ShowPos ? "1" : "0" },
-            { "posat", Pts(new[] { PosAt }) }, { "h", F(TextH) },
+            { "posat", Pts(new[] { PosAt }) }, { "h", F(TextH) }, { "type", Type }, { "maker", Maker }, { "code", Code }, { "unit", Unit }, { "mass", F(Mass) },
         };
 
         public override void Load(IDictionary<string, string> d)
         {
             Sym = S(d, "sym", Sym); Pos = S(d, "pos"); Name = S(d, "name"); Note = S(d, "note"); Qty = D(d, "qty", 1); Angle = D(d, "angle", 0);
-            ShowPos = B(d, "showpos", true); TextH = D(d, "h", 2.5);
+            ShowPos = B(d, "showpos", true); TextH = D(d, "h", 2.5); Type = S(d, "type"); Maker = S(d, "maker"); Code = S(d, "code"); Unit = S(d, "unit", "шт."); Mass = D(d, "mass", 0);
             var p = Pts(S(d, "posat")); if (p.Count > 0) PosAt = p[0];
         }
     }

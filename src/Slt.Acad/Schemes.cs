@@ -171,79 +171,11 @@ namespace Slt.Acad
 
         // ---------------- перечень ----------------
 
-        /// <summary>Элементы для перечня: все приборы и символы в рамке формата, где стоит таблица (или во всём пространстве).</summary>
-        static List<PosItem> Collect(Transaction tr, Database db, ObjectId space, Point3d at)
-        {
-            var refs = SmartRef.All(tr, db).Where(b => b.OwnerId == space).ToList();
-            Extents3d? frame = null;
-            foreach (var b in refs.Where(b => Data.Read(b).TryGetValue("kind", out var kd) && kd == "format"))
-            {
-                var f = (SheetFormat)SmartRef.Load(b); var wh = f.Paper;
-                var e = new Extents3d(b.Position, b.Position + new Vector3d(wh[0] * f.K, wh[1] * f.K, 0));
-                if (at.X >= e.MinPoint.X && at.X <= e.MaxPoint.X && at.Y >= e.MinPoint.Y && at.Y <= e.MaxPoint.Y) { frame = e; break; }
-            }
-            var items = new List<PosItem>();
-            foreach (var b in refs)
-            {
-                if (frame.HasValue)
-                {
-                    var p = b.Position; var e = frame.Value;
-                    if (p.X < e.MinPoint.X || p.X > e.MaxPoint.X || p.Y < e.MinPoint.Y || p.Y > e.MaxPoint.Y) continue;
-                }
-                var o = SmartRef.Load(b);
-                if (o is Instrument i && (i.Pos != "" || i.Name != "")) items.Add(new PosItem(i.Pos, i.Name, i.Qty));
-                else if (o is Symbol y && (y.Pos != "" || y.Name != "")) items.Add(new PosItem(y.Pos, y.Name != "" ? y.Name : y.Def?.Name ?? y.Sym, y.Qty));
-            }
-            return items;
-        }
-
         [CommandMethod("SLT_LIST", CommandFlags.Modal)]
-        public void ListCmd()
-        {
-            var db = Doc.Database;
-            var l = new PosList { K = K(db) };
-            using (var tr = db.TransactionManager.StartOpenCloseTransaction())
-                l.Rows = PosList.Compose(Collect(tr, db, db.CurrentSpaceId, new Point3d(double.NaN, double.NaN, 0)));
-            if (l.Rows.Count == 0) { Ed.WriteMessage("\nНет приборов и символов с позицией или наименованием."); return; }
-            SmartJig jig = null;
-            jig = new SmartJig(l, "Левый верхний угол перечня:", Point3d.Origin, (x, p) => jig.Origin = p);
-            var at = jig.Run(Ed);
-            if (at == null) return;
-            var id = Insert(l, at.Value);
-            UpdateLists(db, id);
-            Ed.WriteMessage("\nПеречень собран из элементов " + (InFrame(db, at.Value) ? "этого листа (рамки формата)." : "всего пространства.") + " Обновить после правок — SLT_LISTUPDATE.");
-        }
-
-        static bool InFrame(Database db, Point3d p)
-        {
-            using (var tr = db.TransactionManager.StartOpenCloseTransaction())
-                return SmartRef.All(tr, db, "format").Any(b =>
-                {
-                    var f = (SheetFormat)SmartRef.Load(b); var wh = f.Paper;
-                    return b.OwnerId == db.CurrentSpaceId && p.X >= b.Position.X && p.X <= b.Position.X + wh[0] * f.K && p.Y >= b.Position.Y && p.Y <= b.Position.Y + wh[1] * f.K;
-                });
-        }
+        public void ListCmd() => TableCommands.Place(new PosList(), "Левый верхний угол перечня:");
 
         [CommandMethod("SLT_LISTUPDATE", CommandFlags.Modal)]
-        public void ListUpdateCmd() => Ed.WriteMessage("\nОбновлено перечней: " + UpdateLists(Doc.Database, ObjectId.Null) + ".");
-
-        static int UpdateLists(Database db, ObjectId only)
-        {
-            int n = 0;
-            using (Doc.LockDocument())
-            using (var tr = db.TransactionManager.StartTransaction())
-            {
-                foreach (var b in SmartRef.All(tr, db, "list"))
-                {
-                    if (!only.IsNull && b.ObjectId != only) continue;
-                    var l = (PosList)SmartRef.Load(b);
-                    l.Rows = PosList.Compose(Collect(tr, db, b.OwnerId, b.Position));
-                    SmartRef.Save(b, l); SmartRef.Rebuild(tr, b); n++;
-                }
-                tr.Commit();
-            }
-            return n;
-        }
+        public void ListUpdateCmd() => Ed.WriteMessage("\nОбновлено таблиц: " + TableCommands.UpdateAll(Doc.Database, ObjectId.Null) + ".");
 
         // ---------------- своя библиотека ----------------
 

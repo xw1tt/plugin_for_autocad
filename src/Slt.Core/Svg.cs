@@ -18,11 +18,12 @@ namespace Slt.Core
             foreach (var s in shapes)
             {
                 var sw = s.Weight == Weight.Thick ? thick : thin;
+                if (s.Color != 0) sb.Append($"<g stroke=\"{Aci(s.Color)}\" fill=\"{(s.Kind == ShapeKind.Fill ? Aci(s.Color) : "none")}\">");
                 switch (s.Kind)
                 {
                     case ShapeKind.Line: sb.Append($"<line x1=\"{F(s.Pts[0].X)}\" y1=\"{F(s.Pts[0].Y)}\" x2=\"{F(s.Pts[1].X)}\" y2=\"{F(s.Pts[1].Y)}\" stroke-width=\"{F(sw)}\"/>"); break;
                     case ShapeKind.Polyline: sb.Append($"<{(s.Closed ? "polygon" : "polyline")} points=\"{Pts(s.Pts)}\" stroke-width=\"{F(sw)}\"/>"); break;
-                    case ShapeKind.Fill: sb.Append($"<polygon points=\"{Pts(s.Pts)}\" fill=\"#000\" stroke=\"none\"/>"); break;
+                    case ShapeKind.Fill: sb.Append($"<polygon points=\"{Pts(s.Pts)}\" fill=\"{(s.Color != 0 ? Aci(s.Color) : "#000")}\" stroke=\"none\"/>"); break;
                     case ShapeKind.Circle: sb.Append($"<circle cx=\"{F(s.Pts[0].X)}\" cy=\"{F(s.Pts[0].Y)}\" r=\"{F(s.R)}\" stroke-width=\"{F(sw)}\"/>"); break;
                     case ShapeKind.Arc:
                         var c = s.Pts[0];
@@ -32,12 +33,15 @@ namespace Slt.Core
                         var p = s.Pts[0];
                         var anchor = s.Ha == HAlign.Left ? "start" : s.Ha == HAlign.Center ? "middle" : "end";
                         var dy = s.Va == VAlign.Bottom ? 0 : s.Va == VAlign.Middle ? s.H / 2 : s.H;
-                        sb.Append($"<text transform=\"translate({F(p.X)} {F(p.Y)}) rotate({F(-s.Rotation * 180 / Math.PI)}) scale(1 -1)\" y=\"{F(dy)}\" font-size=\"{F(s.H * 1.25)}\" font-family=\"ISOCPEUR, 'Liberation Sans Narrow', 'Arial Narrow', Arial\" textLength=\"{F(TextMeasure.Width(s.Text, s.H))}\" lengthAdjust=\"spacingAndGlyphs\" font-style=\"italic\" text-anchor=\"{anchor}\" fill=\"#000\" stroke=\"none\">{System.Security.SecurityElement.Escape(s.Text)}</text>");
+                        sb.Append($"<text transform=\"translate({F(p.X)} {F(p.Y)}) rotate({F(s.Rotation * 180 / Math.PI)}) scale(1 -1)\" y=\"{F(dy)}\" font-size=\"{F(s.H * 1.25)}\" font-family=\"ISOCPEUR, 'Liberation Sans Narrow', 'Arial Narrow', Arial\" textLength=\"{F(TextMeasure.Width(s.Text, s.H))}\" lengthAdjust=\"spacingAndGlyphs\" font-style=\"italic\" text-anchor=\"{anchor}\" fill=\"#000\" stroke=\"none\">{System.Security.SecurityElement.Escape(s.Text)}</text>");
                         break;
                 }
+                if (s.Color != 0) sb.Append("</g>");
             }
             return sb.Append("</g>").ToString();
         }
+
+        static string Aci(int c) { switch (c) { case 1: return "#e02020"; case 2: return "#c8b400"; case 3: return "#10a010"; case 4: return "#00a8e0"; case 5: return "#2040e0"; case 6: return "#c020c0"; case 8: return "#808080"; case 9: return "#a0a0a0"; default: return "#000"; } }
 
         static string Pts(P2[] p) => string.Join(" ", p.Select(x => F(x.X) + "," + F(x.Y)));
 
