@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- СЛТ Графика: папку SltGrafika.bundle положить в %APPDATA%\Autodesk\ApplicationPlugins.
      AutoCAD выбирает сборку по версии: 2016–2024 — Contents\net46, 2025–2026 — Contents\net8. -->
-<ApplicationPackage SchemaVersion="1.0" AutodeskProduct="AutoCAD" ProductType="Application" Name="СЛТ Графика" Description="Оформление чертежей слаботочных систем и автоматизации по ГОСТ: выноски, отметки, оси, форматы со штампом" AppVersion="0.4.0" Author="СЛТ Графика" ProductCode="{5C2E8A14-3B6F-4D71-9E20-A1B3C4D5E6F7}" UpgradeCode="{9E1D7B35-4A2C-4F88-B6D1-0C2E3F4A5B68}">
+<ApplicationPackage SchemaVersion="1.0" AutodeskProduct="AutoCAD" ProductType="Application" Name="СЛТ Графика" Description="Оформление чертежей слаботочных систем и автоматизации по ГОСТ: выноски, отметки, оси, форматы со штампом" AppVersion="0.4.1" Author="СЛТ Графика" ProductCode="{5C2E8A14-3B6F-4D71-9E20-A1B3C4D5E6F7}" UpgradeCode="{9E1D7B35-4A2C-4F88-B6D1-0C2E3F4A5B68}">
   <CompanyDetails Name="СЛТ Графика" />
   <Components Description="AutoCAD 2016–2024 (.NET Framework)">
     <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R20.1" SeriesMax="R24.3" />

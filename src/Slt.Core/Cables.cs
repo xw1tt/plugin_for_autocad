@@ -14,6 +14,7 @@ namespace Slt.Core
         public Weight Weight = Weight.Thick;
         public double[] Dash = new double[0]; // мм листа: штрих, пробел, штрих…
         public double Step;        // шаг знака, мм листа; 0 — без знаков
+        public double Gap;         // разрыв линии под знаком, мм листа (например, излом трубы)
         public readonly List<Shape> Mark = new List<Shape>(); // мм листа: x — вдоль линии, y — поперёк (влево)
         public string Source = "";
     }
@@ -52,7 +53,7 @@ namespace Slt.Core
                             Id = f[0], Name = f.Length > 1 ? f[1] : f[0], Color = (int)Num(2, 0),
                             Weight = f.Length > 3 && f[3].ToLowerInvariant().StartsWith("t") ? Weight.Thick : Weight.Thin,
                             Dash = f.Length > 4 ? f[4].Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Select(x => double.Parse(x.Replace(',', '.'), CultureInfo.InvariantCulture)).Where(x => x > 0).ToArray() : new double[0],
-                            Step = Num(5, 0), Source = source,
+                            Step = Num(5, 0), Gap = Num(6, 0), Source = source,
                         };
                         if (cur.Dash.Length % 2 == 1) cur.Dash = cur.Dash.Concat(new[] { cur.Dash[cur.Dash.Length - 1] }).ToArray();
                         int at = list.FindIndex(x => x.Id == cur.Id);
@@ -70,7 +71,7 @@ namespace Slt.Core
         /// <summary>Обратно в текст (для редактора видов линий): знаки сохраняются как были.</summary>
         public static string Header(LineKind k) =>
             "= " + k.Id + " | " + k.Name + " | " + k.Color + " | " + (k.Weight == Weight.Thick ? "t" : "") + " | " +
-            string.Join(" ", k.Dash.Select(x => x.ToString("0.##", CultureInfo.InvariantCulture))) + " | " + k.Step.ToString("0.##", CultureInfo.InvariantCulture);
+            string.Join(" ", k.Dash.Select(x => x.ToString("0.##", CultureInfo.InvariantCulture))) + " | " + k.Step.ToString("0.##", CultureInfo.InvariantCulture) + (k.Gap > 0 ? " | " + k.Gap.ToString("0.##", CultureInfo.InvariantCulture) : "");
 
         /// <summary>
         /// Места знаков вдоль ломаной: первый — на половине шага от начала, дальше — через шаг; не ближе clearance к вершине.
@@ -93,14 +94,42 @@ namespace Slt.Core
                     var t = next - walked;
                     if (t < clearance) { next = walked + clearance; continue; }
                     if (t > len - clearance) break;
-                    res.Add(new[] { a.X + dx * t / len, a.Y + dy * t / len, ang });
+                    res.Add(new[] { a.X + dx * t / len, a.Y + dy * t / len, ang, walked + t });
                     placed++;
                     next += step;
                 }
-                if (placed == 0 && len > 2 * clearance) { res.Add(new[] { a.X + dx / 2, a.Y + dy / 2, ang }); next = walked + len / 2 + step; }
+                if (placed == 0 && len > 2 * clearance) { res.Add(new[] { a.X + dx / 2, a.Y + dy / 2, ang, walked + len / 2 }); next = walked + len / 2 + step; }
                 walked += len;
                 if (next < walked) next = walked;
             }
+            return res;
+        }
+
+        /// <summary>Ломаная без участков [от, до] (по длине вдоль пути).</summary>
+        public static List<List<P2>> Split(IList<P2> path, List<double[]> gaps)
+        {
+            var res = new List<List<P2>>();
+            if (gaps.Count == 0) { res.Add(path.ToList()); return res; }
+            var cur = new List<P2> { path[0] };
+            double walked = 0;
+            bool InGap(double d) => gaps.Any(g => d > g[0] && d < g[1]);
+            for (int i = 1; i < path.Count; i++)
+            {
+                var a = path[i - 1]; var b = path[i]; var len = (b - a).Length;
+                if (len < 1e-12) continue;
+                var u = (b - a) * (1 / len);
+                // Точки разреза на этом участке.
+                var cuts = gaps.SelectMany(g => new[] { g[0], g[1] }).Where(d => d > walked && d < walked + len).OrderBy(d => d).ToList();
+                foreach (var d in cuts)
+                {
+                    var p = a + u * (d - walked);
+                    if (InGap(d - 1e-9)) { cur = new List<P2> { p }; }           // выход из разрыва — новый кусок
+                    else { cur.Add(p); if (cur.Count > 1) res.Add(cur); cur = null; } // вход в разрыв — кусок закончен
+                }
+                if (cur != null && !InGap(walked + len)) cur.Add(b);
+                walked += len;
+            }
+            if (cur != null && cur.Count > 1) res.Add(cur);
             return res;
         }
 
@@ -142,11 +171,18 @@ namespace Slt.Core
         {
             var k = LineKinds.Get(Line);
             int from = s.Shapes.Count;
-            if (k.Dash.Length == 0) s.Poly(false, k.Weight, Path.ToArray());
-            else Dashed(s, k);
+            // Знак целиком на участке: отступ от вершин — не меньше его половины длины.
+            double reach = k.Mark.SelectMany(m => m.Pts.Select(q => Math.Abs(q.X) + (m.Kind == ShapeKind.Circle || m.Kind == ShapeKind.Arc ? m.R : 0))).DefaultIfEmpty(0).Max();
+            var places = k.Step > 0 && k.Mark.Count > 0 ? LineKinds.Places(Path, s.U(k.Step), s.U(Math.Max(4, Math.Max(k.Gap / 2, reach) + 1))) : new List<double[]>();
+            // Разрывы под знаками (излом трубы): линия рисуется кусками между ними.
+            var gaps = k.Gap > 0 ? places.Select(p => new[] { p[3] - s.U(k.Gap) / 2, p[3] + s.U(k.Gap) / 2 }).ToList() : new List<double[]>();
+            foreach (var piece in LineKinds.Split(Path, gaps))
+            {
+                if (k.Dash.Length == 0) s.Poly(false, k.Weight, piece.ToArray());
+                else Dashed(s, k, piece);
+            }
+            foreach (var pl in places) LineKinds.DrawMark(s, k, pl[0], pl[1], pl[2]);
             for (int i = from; i < s.Shapes.Count; i++) s.Shapes[i].Color = k.Color;
-            if (k.Step > 0 && k.Mark.Count > 0)
-                foreach (var pl in LineKinds.Places(Path, s.U(k.Step), s.U(4))) LineKinds.DrawMark(s, k, pl[0], pl[1], pl[2]);
             // Обозначение — над самым длинным участком, вдоль него, читаемо.
             var label = Label;
             if (label != "" && Path.Count >= 2)
@@ -165,7 +201,7 @@ namespace Slt.Core
             }
         }
 
-        void Dashed(Sketch s, LineKind k)
+        void Dashed(Sketch s, LineKind k, List<P2> Path)
         {
             var pat = k.Dash.Select(s.U).ToArray();
             int pi = 0; double left = pat[0]; bool on = true;

@@ -207,11 +207,12 @@ namespace Slt.Acad
                 grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = "Толстая", Width = 60 });
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Штрихи, мм", Width = 110, ToolTipText = "«штрих пробел …», например «8 2» или «12 2 1 2»; пусто — сплошная" });
                 grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Шаг знака, мм", Width = 100, ToolTipText = "Через сколько мм листа повторяется знак способа прокладки; 0 — без знака" });
-                grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Знак", Width = 180, ReadOnly = true, ToolTipText = "Рисунок знака — в файле, кнопка «Знаки в файле…»" });
+                grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Разрыв, мм", Width = 80, ToolTipText = "Линия прерывается под знаком на эту длину (излом трубы); 0 — сплошная под знаком" });
+                grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Знак", Width = 120, ReadOnly = true, ToolTipText = "Рисунок знака — в файле, кнопка «Знаки в файле…»" });
                 foreach (var k in LineKinds.All)
                     grid.Rows.Add(k.Id, k.Name, k.Color.ToString(CultureInfo.InvariantCulture), k.Weight == Weight.Thick,
                         string.Join(" ", k.Dash.Select(x => x.ToString("0.##", CultureInfo.InvariantCulture))), k.Step.ToString("0.##", CultureInfo.InvariantCulture),
-                        k.Mark.Count == 0 ? "—" : k.Mark.Count + " элем.");
+                        k.Gap.ToString("0.##", CultureInfo.InvariantCulture), k.Mark.Count == 0 ? "—" : k.Mark.Count + " элем.");
                 var hint = new Label
                 {
                     Dock = DockStyle.Top, Height = 40, Padding = new Padding(6, 6, 6, 0),
@@ -260,7 +261,7 @@ namespace Slt.Acad
                 kinds.Add(new LineKind
                 {
                     Id = id.Replace("|", ""), Name = name.Replace("|", "/"), Color = (int)Num(r.Cells[2].Value),
-                    Weight = r.Cells[3].Value is bool b && b ? Weight.Thick : Weight.Thin, Dash = dash, Step = Math.Max(0, Num(r.Cells[5].Value)),
+                    Weight = r.Cells[3].Value is bool b && b ? Weight.Thick : Weight.Thin, Dash = dash, Step = Math.Max(0, Num(r.Cells[5].Value)), Gap = Math.Max(0, Num(r.Cells[6].Value)),
                 });
             }
             if (kinds.Count > 0) UserLines.Save(kinds);

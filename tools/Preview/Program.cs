@@ -94,9 +94,9 @@ foreach (var c in cols) fsa.Columns.Add(new FsaColumn { Num = c[0], Text = c[1],
 t.Append(Svg.Group(fsa.Shapes(), 10, 10));
 var leg = new LineLegend();
 t.Append(Svg.Group(leg.Shapes(), 150, 20));
-var cab = new Cable { Mark = "К20", Type = "КСПЭВПнг(А)-HF 2x2x0,97", ShowType = true, Line = "tray", Path = new List<P2> { new P2(0, 0), new P2(60, 0), new P2(60, -30) } };
+var cab = new Cable { Mark = "К20", Type = "КСПЭВПнг(А)-HF 2x2x0,97", ShowType = true, Line = "pipe", Path = new List<P2> { new P2(0, 0), new P2(60, 0), new P2(60, -30) } };
 t.Append(Svg.Group(cab.Shapes(), 150, 70));
-var cab2 = new Cable { Mark = "К21", Line = "hose", Path = new List<P2> { new P2(0, 0), new P2(-40, 25) } };
+var cab2 = new Cable { Mark = "К21", Line = "corr", Path = new List<P2> { new P2(0, 0), new P2(-40, 25) } };
 t.Append(Svg.Group(cab2.Shapes(), 260, 110));
 var jr = new Journal { Rows = Journal.Compose(new[] {
     new JournalItem { Mark = "К21", From = "ШУ-ПВ1", To = "TE1", Type = "КСПЭВПнг(А)-HF 2x2x0,97", Meters = 35 },
