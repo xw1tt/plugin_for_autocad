@@ -142,6 +142,7 @@ namespace Slt.Acad
                 {
                     if (!only.IsNull && b.ObjectId != only) continue;
                     var t = SmartRef.Load(b);
+                    if (!IsAuto(t)) continue;
                     Fill(t, Scope(tr, db, b.OwnerId, b.Position), db);
                     SmartRef.Save(b, t); SmartRef.Rebuild(tr, b); n++;
                 }
@@ -150,12 +151,33 @@ namespace Slt.Acad
             return n;
         }
 
+        static bool IsAuto(Smart t) => t is PosList l ? l.Auto : t is Journal j ? j.Auto : t is Spec sp ? sp.Auto : false;
+        static void SetAuto(Smart t, bool v) { if (t is PosList l) l.Auto = v; if (t is Journal j) j.Auto = v; if (t is Spec sp) sp.Auto = v; }
+        internal static List<string[]> RowsOf(Smart t) => t is PosList l ? l.Rows : t is Journal j ? j.Rows : t is Spec sp ? sp.Rows : new List<string[]>();
+
+        /// <summary>Строки таблицы по объектам её листа (для кнопки «Заполнить из чертежа»).</summary>
+        internal static List<string[]> Refill(Smart t, ObjectId owner, Point3d at)
+        {
+            var db = Doc.Database;
+            var copy = Smart.From(t.SaveAll());
+            using (var tr = db.TransactionManager.StartOpenCloseTransaction())
+                Fill(copy, Scope(tr, db, owner.IsNull ? db.CurrentSpaceId : owner, at), db);
+            return RowsOf(copy);
+        }
+
         internal static void Place(Smart t, string prompt)
         {
             var db = Doc.Database;
             t.K = Settings.Read(db).KFor(db, db.CurrentSpaceId);
             using (var tr = db.TransactionManager.StartOpenCloseTransaction())
                 Fill(t, Scope(tr, db, db.CurrentSpaceId, new Point3d(double.NaN, 0, 0)), db);
+            // Объектов СЛТ нет — таблица заполняется вручную (или вставкой из Excel).
+            if (RowsOf(t).Count == 0)
+            {
+                Ed.WriteMessage("\nНа чертеже нет объектов СЛТ для этой таблицы — заполните её вручную или вставьте строки из Excel (Ctrl+V).");
+                SetAuto(t, false);
+                if (!TableDialog.Edit(t, null)) return;
+            }
             SmartJig jig = null;
             jig = new SmartJig(t, prompt, Point3d.Origin, (x, p) => jig.Origin = p);
             var at = jig.Run(Ed);
@@ -167,10 +189,11 @@ namespace Slt.Acad
                 id = SmartRef.Create(tr, db, (BlockTableRecord)tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite), t, at.Value).ObjectId;
                 tr.Commit();
             }
-            UpdateAll(db, id);
+            if (IsAuto(t)) UpdateAll(db, id);
             bool framed;
             using (var tr = db.TransactionManager.StartOpenCloseTransaction()) framed = Frame(SmartRef.All(tr, db).Where(b => b.OwnerId == db.CurrentSpaceId), at.Value).HasValue;
-            Ed.WriteMessage("\n" + t.Title + " — по элементам " + (framed ? "этого листа (рамки формата)." : "всего пространства.") + " После правок — «Обновить таблицы» (SLT_LISTUPDATE).");
+            if (IsAuto(t)) Ed.WriteMessage("\n" + t.Title + " — по элементам " + (framed ? "этого листа (рамки формата)." : "всего пространства.") + " После правок — «Обновить таблицы». Двойной щелчок — правка строк.");
+            else Ed.WriteMessage("\n" + t.Title + " заполнена вручную. Двойной щелчок — правка строк.");
         }
 
         // ---------------- кабели ----------------

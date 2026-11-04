@@ -11,5 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="library.txt" LogicalName="Slt.Core.library.txt" />
+    <EmbeddedResource Include="lines.txt" LogicalName="Slt.Core.lines.txt" />
   </ItemGroup>
 </Project>

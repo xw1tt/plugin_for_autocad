@@ -31,6 +31,7 @@ namespace Slt.Acad
             {
                 Draw.HookMeasure();
                 UserLibrary.Load();
+                foreach (var er in UserLines.Load()) AcApp.DocumentManager.MdiActiveDocument?.Editor.WriteMessage("\nСЛТ: " + er);
                 var cls = RXObject.GetClass(typeof(BlockReference));
                 draw = new SmartDraw(); draw.SetXDataFilter(Data.App);
                 grips = new SmartGrips(); grips.SetXDataFilter(Data.App);
@@ -286,7 +287,7 @@ namespace Slt.Acad
         public void AxesCmd()
         {
             var db = Doc.Database;
-            var g = new AxisGrid { K = K(db) };
+            var g = new AxisGrid { K = K(db), Units = Settings.UnitsPerMm(db) };
             if (!Dialogs.Edit(g)) return;
             SmartJig jig = null;
             jig = new SmartJig(g, "Точка пересечения первых осей (1/А):", Point3d.Origin, (o, p) => jig.Origin = p);
@@ -323,8 +324,6 @@ namespace Slt.Acad
             if (f.AutoNumber) Number(db, quiet: true);
         }
 
-        [CommandMethod("SLT_SHEETS", CommandFlags.Modal)]
-        public void SheetsCmd() => Number(Doc.Database, quiet: false);
 
         /// <summary>Нумерация: на листах — по порядку вкладок, в модели — сверху вниз рядами, в ряду слева направо.</summary>
         static void Number(Database db, bool quiet)
@@ -345,7 +344,10 @@ namespace Slt.Acad
                 var ordered = items.OrderBy(i => i.tab)
                     .ThenBy(i => -Math.Round(i.b.Position.Y / rowTol))
                     .ThenBy(i => i.b.Position.X).ToList();
-                SheetFormat.Number(ordered.Select(i => i.o).ToList());
+                // Начальный номер — как у первого нумеруемого листа (задаётся в окне «Нумерация»).
+                var first = ordered.FirstOrDefault(i => i.o.AutoNumber);
+                int start = first != null && int.TryParse(first.o.Field("sheet"), out var st) && st > 0 ? st : 1;
+                SheetFormat.Number(ordered.Select(i => i.o).ToList(), start);
                 foreach (var i in ordered)
                 {
                     SmartRef.Save(i.b, i.o);
@@ -417,7 +419,7 @@ namespace Slt.Acad
             {
                 if (!(tr.GetObject(id, OpenMode.ForRead) is BlockReference br) || !Data.IsSmart(br)) { Ed.WriteMessage("\nЭто не объект СЛТ."); return; }
                 var obj = SmartRef.Load(br);
-                if (!Dialogs.Edit(obj)) return;
+                if (!Dialogs.Edit(obj, br)) return;
                 SmartRef.Save(br, obj);
                 SmartRef.Rebuild(tr, br);
                 tr.Commit();

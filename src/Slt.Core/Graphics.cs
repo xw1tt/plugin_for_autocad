@@ -39,6 +39,8 @@ namespace Slt.Core
         public Weight Weight = Weight.Thin;
         /// <summary>Цвет ACI; 0 — по блоку (цвет объекта).</summary>
         public int Color;
+        /// <summary>Степень растяжения текста (сжатие по ширине, чтобы влезть в графу при той же высоте).</summary>
+        public double WidthFactor = 1;
     }
 
     /// <summary>Построитель: размеры задаются в мм листа и умножаются на k — единиц чертежа в 1 мм листа.</summary>
@@ -57,6 +59,17 @@ namespace Slt.Core
             if (!string.IsNullOrEmpty(text)) Shapes.Add(new Shape { Kind = ShapeKind.Text, Pts = new[] { at }, Text = text, H = h, Ha = ha, Va = va, Rotation = rot });
             return this;
         }
+        /// <summary>Текст заданной высоты, сжатый по ширине до maxWidth (не уже 0,5); дальше — уменьшение высоты.</summary>
+        public Sketch TextFit(P2 at, string text, double h, double maxWidth, HAlign ha = HAlign.Left, VAlign va = VAlign.Middle, double rot = 0)
+        {
+            if (string.IsNullOrEmpty(text)) return this;
+            var w = TextMeasure.Width(text, h);
+            double f = 1;
+            if (w > maxWidth && w > 0) { f = maxWidth / w; if (f < 0.5) { h *= f / 0.5; f = 0.5; } }
+            Shapes.Add(new Shape { Kind = ShapeKind.Text, Pts = new[] { at }, Text = text, H = h, Ha = ha, Va = va, Rotation = rot, WidthFactor = f });
+            return this;
+        }
+
         /// <summary>Мм листа → единицы чертежа.</summary>
         public double U(double mm) => mm * K;
     }

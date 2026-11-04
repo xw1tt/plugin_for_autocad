@@ -32,6 +32,9 @@ namespace Slt.Core
 
         public static readonly string[] DefaultRoles = { "Разраб.", "Пров.", "", "Н.контр.", "ГИП" };
 
+        /// <summary>Должность в строке подписи i (0…4): своя или по умолчанию.</summary>
+        public string Role(int i) => Fields.ContainsKey("r" + (i + 1)) ? Field("r" + (i + 1)) : DefaultRoles[i];
+
         public string Field(string k) => Fields.TryGetValue(k, out var v) ? v ?? "" : "";
 
         /// <summary>Размер листа, мм: ширина × высота.</summary>
@@ -59,10 +62,10 @@ namespace Slt.Core
             // Лист и рамка: слева 20, остальные 5 мм.
             s.Poly(true, Weight.Thin, P(0, 0), P(w, 0), P(w, h), P(0, h));
             s.Poly(true, Weight.Thick, P(20, 5), P(w - 5, 5), P(w - 5, h - 5), P(20, h - 5));
-            T(w - 5, 1.5, "Формат " + Caption, 2.5, HAlign.Right, VAlign.Middle);
+            T(w - 5, 0.8, "Формат " + Caption, 2.5, HAlign.Right, VAlign.Bottom);
             double x0 = w - 5 - 185, y0 = 5;
             if (Stamp == StampForm.Form3) Form3(s, x0, y0, L, T, Fit);
-            else if (Stamp == StampForm.Form6) Form6(x0, y0, L, T);
+            else if (Stamp == StampForm.Form6) Form6(s, x0, y0, L, T);
             if (Extra)
             {
                 // Дополнительные графы на поле подшивки: 12 мм (5 + 7), снизу вверх — 25, 35, 25.
@@ -107,14 +110,17 @@ namespace Slt.Core
             L(x + 20, y, x + 20, y + 25, Weight.Thick);
             string[] head = { "Изм.", "Кол.уч", "Лист", "№ док.", "Подп.", "Дата" };
             cx = x;
-            for (int i = 0; i < head.Length; i++) { T(cx + cw[i] / 2, y + 27.5, head[i], fit(head[i], cw[i] - 1, 2.0), HAlign.Center); cx += cw[i]; }
+            // Все подписи — одной высоты 2,5 мм; длинное — сжимается по ширине (ГОСТ 2.304 допускает), а не мельчит.
+            P2 Q(double a, double b) => new P2(s.U(a), s.U(b));
+            const double SH = 2.5;
+            for (int i = 0; i < head.Length; i++) { s.TextFit(Q(cx + cw[i] / 2, y + 27.5), head[i], s.U(SH), s.U(cw[i] - 1), HAlign.Center); cx += cw[i]; }
             for (int i = 0; i < 5; i++)
             {
                 var yy = y + 22.5 - i * 5;
-                var role = Fields.ContainsKey("r" + (i + 1)) ? Field("r" + (i + 1)) : DefaultRoles[i];
-                T(x + 1, yy, role, fit(role, 18, 2.0));
-                T(x + 21, yy, Field("n" + (i + 1)), fit(Field("n" + (i + 1)), 18, 2.0));
-                T(x + 60, yy, Field("d" + (i + 1)), fit(Field("d" + (i + 1)), 9, 1.8), HAlign.Center);
+                var role = Role(i);
+                s.TextFit(Q(x + 1, yy), role, s.U(SH), s.U(18.5));
+                s.TextFit(Q(x + 21, yy), Field("n" + (i + 1)), s.U(SH), s.U(18.5));
+                s.TextFit(Q(x + 60, yy), Field("d" + (i + 1)), s.U(SH), s.U(9.2), HAlign.Center);
             }
             double rx = x + 65;
             // Правая часть (120 мм): обозначение 10 | объект 15 | раздел + стадия/лист/листов 15 | наименование листа + организация 15.
@@ -129,7 +135,7 @@ namespace Slt.Core
             Block(T, rx + 60, y + 37.5, Field("object"), 116, 15, 3);
             Block(T, rx + 35, y + 22.5, Field("section"), 68, 15, 3);
             Block(T, rx + 35, y + 7.5, Field("title"), 68, 15, 3);
-            T(rx + 77.5, y + 27.5, "Стадия", 2.0, HAlign.Center); T(rx + 92.5, y + 27.5, "Лист", 2.0, HAlign.Center); T(rx + 110, y + 27.5, "Листов", 2.0, HAlign.Center);
+            s.TextFit(Q(rx + 77.5, y + 27.5), "Стадия", s.U(SH), s.U(14), HAlign.Center); s.TextFit(Q(rx + 92.5, y + 27.5), "Лист", s.U(SH), s.U(14), HAlign.Center); s.TextFit(Q(rx + 110, y + 27.5), "Листов", s.U(SH), s.U(19), HAlign.Center);
             T(rx + 77.5, y + 20, Field("stage"), 3, HAlign.Center); T(rx + 92.5, y + 20, Field("sheet"), 3, HAlign.Center); T(rx + 110, y + 20, Field("sheets"), 3, HAlign.Center);
             Block(T, rx + 95, y + 7.5, Field("org"), 48, 15, 3);
         }
@@ -171,7 +177,7 @@ namespace Slt.Core
         }
 
         /// <summary>Форма 6 (185×15) для последующих листов: изменения (3 строки), обозначение, номер листа.</summary>
-        void Form6(double x, double y, LineFn L, TextFn T)
+        void Form6(Sketch s, double x, double y, LineFn L, TextFn T)
         {
             L(x, y, x, y + 15, Weight.Thick); L(x, y + 15, x + 185, y + 15, Weight.Thick);
             double[] cw = { 10, 10, 10, 10, 15, 10 };
@@ -180,7 +186,7 @@ namespace Slt.Core
             foreach (var w in cw) { cx += w; L(cx, y, cx, y + 15, Weight.Thick); }
             string[] head = { "Изм.", "Кол.уч", "Лист", "№ док.", "Подп.", "Дата" };
             cx = x;
-            for (int i = 0; i < head.Length; i++) { T(cx + cw[i] / 2, y + 2.5, head[i], Fit(head[i], cw[i] - 1, 2.0), HAlign.Center); cx += cw[i]; }
+            for (int i = 0; i < head.Length; i++) { s.TextFit(new P2(s.U(cx + cw[i] / 2), s.U(y + 2.5)), head[i], s.U(2.5), s.U(cw[i] - 1), HAlign.Center); cx += cw[i]; }
             L(x + 175, y, x + 175, y + 15, Weight.Thick); L(x + 175, y + 8, x + 185, y + 8, Weight.Thin);
             T(x + 120, y + 7.5, Field("code"), Fit(Field("code"), 106, 5), HAlign.Center);
             T(x + 180, y + 11.5, "Лист", 2.0, HAlign.Center);
@@ -207,13 +213,13 @@ namespace Slt.Core
         }
 
         /// <summary>Автонумерация: листы по порядку (как отдаст CAD — по вкладкам листов или слева направо в модели).</summary>
-        public static void Number(IList<SheetFormat> sheets)
+        public static void Number(IList<SheetFormat> sheets, int start = 1)
         {
             var auto = sheets.Where(s => s.AutoNumber).ToList();
             for (int i = 0; i < auto.Count; i++)
             {
-                auto[i].Fields["sheet"] = (i + 1).ToString(CultureInfo.InvariantCulture);
-                if (auto[i].Stamp == StampForm.Form3) auto[i].Fields["sheets"] = auto.Count.ToString(CultureInfo.InvariantCulture);
+                auto[i].Fields["sheet"] = (start + i).ToString(CultureInfo.InvariantCulture);
+                if (auto[i].Stamp == StampForm.Form3) auto[i].Fields["sheets"] = (start - 1 + auto.Count).ToString(CultureInfo.InvariantCulture);
             }
         }
     }

@@ -101,7 +101,7 @@ namespace Slt.Core
             }
         }
 
-        static Shape Prim(string line)
+        internal static Shape Prim(string line)
         {
             string text = null;
             var q = line.IndexOf('"');

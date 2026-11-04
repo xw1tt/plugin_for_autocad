@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Slt.Core;
+using BlockReference = Autodesk.AutoCAD.DatabaseServices.BlockReference;
 using Shape = Slt.Core.Shape;
 using Leader = Slt.Core.Leader;
 
@@ -62,17 +63,17 @@ namespace Slt.Acad
     public sealed class AxisView : IView
     {
         [DisplayName("Марка оси"), Description("Цифра или буква (кроме Ё, З, Й, О, Х, Ц, Ч, Щ, Ъ, Ы, Ь).")] public string Name { get; set; }
-        [DisplayName("Диаметр кружка, мм"), Description("6…12 мм по ГОСТ 21.101.")] public double D { get; set; }
+        [DisplayName("Диаметр кружка, мм"), Description("6…12 мм по ГОСТ 21.101; для крупных планов — до 60 мм.")] public double D { get; set; }
         [DisplayName("Кружки с двух сторон")] public bool Both { get; set; }
         [DisplayName("Высота текста, мм")] public double H { get; set; }
         public AxisView(Axis a) { Name = a.Name; D = a.Diameter; Both = a.BubbleAtStart; H = a.TextH; }
-        public void To(Smart o) { var a = (Axis)o; a.Name = Name ?? ""; a.Diameter = Math.Max(6, Math.Min(12, D)); a.BubbleAtStart = Both; a.TextH = H > 0 ? H : 3.5; }
+        public void To(Smart o) { var a = (Axis)o; a.Name = Name ?? ""; a.Diameter = Math.Max(3, Math.Min(60, D)); a.BubbleAtStart = Both; a.TextH = H > 0 ? H : 3.5; }
     }
 
     public sealed class AxesView : IView
     {
-        [Category("Шаги"), DisplayName("Шаги по X, мм"), Description("Через запятую, повтор — звёздочкой: «6000*4, 3000».")] public string Xs { get; set; }
-        [Category("Шаги"), DisplayName("Шаги по Y, мм")] public string Ys { get; set; }
+        [Category("Шаги"), DisplayName("Расстояния по X, мм"), Description("Между соседними осями слева направо, через запятую: «6000, 6000, 4500, 3000». Одинаковые подряд — звёздочкой: «6000*4, 3000». Каждую ось можно также перетащить ручкой на плане.")] public string Xs { get; set; }
+        [Category("Шаги"), DisplayName("Расстояния по Y, мм"), Description("Между соседними осями снизу вверх, так же через запятую.")] public string Ys { get; set; }
         [Category("Марки"), DisplayName("Первая ось по X"), Description("Цифровые оси — слева направо.")] public string X1 { get; set; }
         [Category("Марки"), DisplayName("Первая ось по Y"), Description("Буквенные оси — снизу вверх.")] public string Y1 { get; set; }
         [Category("Кружки"), DisplayName("Снизу")] public bool B { get; set; }
@@ -81,13 +82,14 @@ namespace Slt.Acad
         [Category("Кружки"), DisplayName("Справа")] public bool R { get; set; }
         [Category("Вид"), DisplayName("Размерные цепочки")] public bool Dims { get; set; }
         [Category("Вид"), DisplayName("Выход осей, мм листа")] public double Ov { get; set; }
-        [Category("Вид"), DisplayName("Диаметр кружка, мм")] public double D { get; set; }
-        public AxesView(AxisGrid g) { Xs = g.XSpans; Ys = g.YSpans; X1 = g.XFirst; Y1 = g.YFirst; B = g.Bottom; L = g.Left; T = g.Top; R = g.Right; Dims = g.Dimensions; Ov = g.Overshoot; D = g.Diameter; }
+        [Category("Вид"), DisplayName("Диаметр кружка, мм листа"), Description("6…12 мм по ГОСТ 21.101; для крупных планов — до 60 мм. Размер умножается на масштаб оформления (SLT_SCALE).")] public double D { get; set; }
+        [Category("Вид"), DisplayName("Высота марки, мм листа"), Description("0 — по диаметру кружка.")] public double H { get; set; }
+        public AxesView(AxisGrid g) { H = g.TextH; Xs = g.XSpans; Ys = g.YSpans; X1 = g.XFirst; Y1 = g.YFirst; B = g.Bottom; L = g.Left; T = g.Top; R = g.Right; Dims = g.Dimensions; Ov = g.Overshoot; D = g.Diameter; }
         public void To(Smart o)
         {
             AxisNames.Spans(Xs); AxisNames.Spans(Ys); // проверка формата — исключение покажет окно
             var g = (AxisGrid)o; g.XSpans = Xs; g.YSpans = Ys; g.XFirst = X1; g.YFirst = Y1; g.Bottom = B; g.Left = L; g.Top = T; g.Right = R;
-            g.Dimensions = Dims; g.Overshoot = Math.Max(10, Ov); g.Diameter = Math.Max(6, Math.Min(12, D));
+            g.Dimensions = Dims; g.Overshoot = Math.Max(5, Ov); g.Diameter = Math.Max(3, Math.Min(60, D)); g.TextH = Math.Max(0, H);
         }
     }
 
@@ -107,13 +109,22 @@ namespace Slt.Acad
         [Category("3. Нумерация"), DisplayName("Автонумерация"), Description("Лист и листов — командой «Нумерация листов».")] public bool Auto { get; set; }
         [Category("3. Нумерация"), DisplayName("Лист")] public string Sheet { get; set; }
         [Category("3. Нумерация"), DisplayName("Листов")] public string Sheets { get; set; }
-        [Category("4. Подписи"), DisplayName("Разраб.")] public string N1 { get; set; }
-        [Category("4. Подписи"), DisplayName("Пров.")] public string N2 { get; set; }
-        [Category("4. Подписи"), DisplayName("Строка 3: должность")] public string R3 { get; set; }
-        [Category("4. Подписи"), DisplayName("Строка 3: фамилия")] public string N3 { get; set; }
-        [Category("4. Подписи"), DisplayName("Н.контр.")] public string N4 { get; set; }
-        [Category("4. Подписи"), DisplayName("ГИП")] public string N5 { get; set; }
-        [Category("4. Подписи"), DisplayName("Дата"), Description("Для всех подписей: ММ.ГГ.")] public string Date { get; set; }
+        [Category("4. Подписи"), DisplayName("1. Должность"), Description("Левая графа строки 1: «Разраб.», «Глав. инж.», «Нач. отд.»… Своя для каждой строки.")] public string R1 { get; set; }
+        [Category("4. Подписи"), DisplayName("1. Фамилия")] public string N1 { get; set; }
+        [Category("4. Подписи"), DisplayName("1. Дата"), Description("ММ.ГГ. Пусто — общая дата ниже (если строка заполнена).")] public string D1 { get; set; }
+        [Category("4. Подписи"), DisplayName("2. Должность"), Description("Левая графа строки 2: «Разраб.», «Глав. инж.», «Нач. отд.»… Своя для каждой строки.")] public string R2 { get; set; }
+        [Category("4. Подписи"), DisplayName("2. Фамилия")] public string N2 { get; set; }
+        [Category("4. Подписи"), DisplayName("2. Дата"), Description("ММ.ГГ. Пусто — общая дата ниже (если строка заполнена).")] public string D2 { get; set; }
+        [Category("4. Подписи"), DisplayName("3. Должность"), Description("Левая графа строки 3: «Разраб.», «Глав. инж.», «Нач. отд.»… Своя для каждой строки.")] public string R3 { get; set; }
+        [Category("4. Подписи"), DisplayName("3. Фамилия")] public string N3 { get; set; }
+        [Category("4. Подписи"), DisplayName("3. Дата"), Description("ММ.ГГ. Пусто — общая дата ниже (если строка заполнена).")] public string D3 { get; set; }
+        [Category("4. Подписи"), DisplayName("4. Должность"), Description("Левая графа строки 4: «Разраб.», «Глав. инж.», «Нач. отд.»… Своя для каждой строки.")] public string R4 { get; set; }
+        [Category("4. Подписи"), DisplayName("4. Фамилия")] public string N4 { get; set; }
+        [Category("4. Подписи"), DisplayName("4. Дата"), Description("ММ.ГГ. Пусто — общая дата ниже (если строка заполнена).")] public string D4 { get; set; }
+        [Category("4. Подписи"), DisplayName("5. Должность"), Description("Левая графа строки 5: «Разраб.», «Глав. инж.», «Нач. отд.»… Своя для каждой строки.")] public string R5 { get; set; }
+        [Category("4. Подписи"), DisplayName("5. Фамилия")] public string N5 { get; set; }
+        [Category("4. Подписи"), DisplayName("5. Дата"), Description("ММ.ГГ. Пусто — общая дата ниже (если строка заполнена).")] public string D5 { get; set; }
+        [Category("4. Подписи"), DisplayName("Общая дата"), Description("Для строк с фамилией, где своя дата не указана: ММ.ГГ.")] public string Date { get; set; }
 
         public FormatView(SheetFormat f)
         {
@@ -121,7 +132,10 @@ namespace Slt.Acad
             Stamp = f.Stamp == StampForm.Form6 ? Штамп.Форма6 : f.Stamp == StampForm.None ? Штамп.Нет : Штамп.Форма3;
             Code = f.Field("code"); Object = f.Field("object"); Section = f.Field("section"); Title = f.Field("title"); Stage = f.Field("stage"); Org = f.Field("org");
             Sheet = f.Field("sheet"); Sheets = f.Field("sheets");
-            N1 = f.Field("n1"); N2 = f.Field("n2"); R3 = f.Field("r3"); N3 = f.Field("n3"); N4 = f.Field("n4"); N5 = f.Field("n5"); Date = f.Field("d1");
+            R1 = f.Role(0); R2 = f.Role(1); R3 = f.Role(2); R4 = f.Role(3); R5 = f.Role(4);
+            N1 = f.Field("n1"); N2 = f.Field("n2"); N3 = f.Field("n3"); N4 = f.Field("n4"); N5 = f.Field("n5");
+            D1 = f.Field("d1"); D2 = f.Field("d2"); D3 = f.Field("d3"); D4 = f.Field("d4"); D5 = f.Field("d5");
+            Date = new[] { D1, D2, D3, D4, D5 }.GroupBy(x => x).Where(g => g.Key != "").OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault() ?? "";
         }
 
         public void To(Smart o)
@@ -132,8 +146,12 @@ namespace Slt.Acad
             void Set(string k, string v) => f.Fields[k] = v ?? "";
             Set("code", Code); Set("object", Object); Set("section", Section); Set("title", Title); Set("stage", Stage); Set("org", Org);
             Set("sheet", Sheet); Set("sheets", Sheets);
-            Set("n1", N1); Set("n2", N2); Set("r3", R3); Set("n3", N3); Set("n4", N4); Set("n5", N5);
-            for (int i = 1; i <= 5; i++) Set("d" + i, string.IsNullOrWhiteSpace(f.Field("n" + i)) ? "" : Date);
+            var rs = new[] { R1, R2, R3, R4, R5 }; var ns = new[] { N1, N2, N3, N4, N5 }; var ds = new[] { D1, D2, D3, D4, D5 };
+            for (int i = 0; i < 5; i++)
+            {
+                Set("r" + (i + 1), rs[i]); Set("n" + (i + 1), ns[i]);
+                Set("d" + (i + 1), !string.IsNullOrWhiteSpace(ds[i]) && ds[i] != Date ? ds[i] : string.IsNullOrWhiteSpace(ns[i]) ? "" : Date);
+            }
         }
     }
 
@@ -252,7 +270,7 @@ namespace Slt.Acad
 
     public sealed class LegendView : IView
     {
-        [DisplayName("Виды линий"), Description("Через запятую: " + "an — аналоговые/дискретные, rs485, eth — Ethernet, ecat — EtherCAT, fo — ВОЛС, knx, pwr — питание, dash — штриховая.")] public string Kinds { get; set; }
+        [DisplayName("Виды линий"), Description("id через запятую (open, pipe, corr, tray, box, hose и свои — SLT_LINES). Пусто — все виды.")] public string Kinds { get; set; }
         [DisplayName("Высота текста, мм")] public double H { get; set; }
         public LegendView(LineLegend l) { Kinds = l.Kinds; H = l.TextH; }
         public void To(Smart o) { var l = (LineLegend)o; l.Kinds = Kinds ?? ""; l.TextH = H > 0 ? H : 2.5; }
@@ -282,14 +300,15 @@ namespace Slt.Acad
         }
 
         /// <summary>Окно свойств; true — применить.</summary>
-        public static bool Edit(Smart o)
+        public static bool Edit(Smart o, BlockReference br = null)
         {
             if (o is FsaTable ft) return FsaDialog.Edit(ft);
+            if (o is PosList || o is Journal || o is Spec) return TableDialog.Edit(o, br);
             var view = ViewOf(o);
             if (view == null) return false;
             using (var form = new Form
             {
-                Text = o.Title + " — свойства", Width = 460, Height = o is SheetFormat ? 640 : o is Instrument ? 560 : 420, StartPosition = FormStartPosition.CenterParent,
+                Text = o.Title + " — свойства", Width = 460, Height = o is SheetFormat ? 720 : o is Instrument ? 560 : 420, StartPosition = FormStartPosition.CenterParent,
                 FormBorderStyle = FormBorderStyle.SizableToolWindow, MinimizeBox = false, MaximizeBox = false, ShowInTaskbar = false, Font = new Font("Segoe UI", 9f),
             })
             {

@@ -358,12 +358,16 @@ namespace Slt.Core
         /// <summary>Выход осей за крайние, мм листа (до кружка).</summary>
         public double Overshoot = 20;
         public double Diameter = 8;
-        public double TextH = 3.5;
+        /// <summary>Высота марки, мм листа; 0 — по диаметру кружка (0,45·D).</summary>
+        public double TextH = 0;
+        /// <summary>Единиц чертежа в 1 мм натуры: шаги задаются в мм, чертёж может быть в метрах.</summary>
+        public double Units = 1;
         public override string Kind => "axes";
+        double MarkH => TextH > 0 ? TextH : Math.Max(2.5, Diameter * 0.45);
         public override string Title => "Массив осей";
 
-        public List<double> Xs() { var l = new List<double> { 0 }; foreach (var v in AxisNames.Spans(XSpans)) l.Add(l[l.Count - 1] + v); return l; }
-        public List<double> Ys() { var l = new List<double> { 0 }; foreach (var v in AxisNames.Spans(YSpans)) l.Add(l[l.Count - 1] + v); return l; }
+        public List<double> Xs() { var l = new List<double> { 0 }; foreach (var v in AxisNames.Spans(XSpans)) l.Add(l[l.Count - 1] + v * Units); return l; }
+        public List<double> Ys() { var l = new List<double> { 0 }; foreach (var v in AxisNames.Spans(YSpans)) l.Add(l[l.Count - 1] + v * Units); return l; }
 
         public override void Build(Sketch s)
         {
@@ -375,15 +379,15 @@ namespace Slt.Core
             {
                 var x = xs[i];
                 Dash.DashDot(s, new P2(x, Bottom ? y0 - ov : y0 - s.U(5)), new P2(x, Top ? y1 + ov : y1 + s.U(5)));
-                if (Bottom) { s.Circle(new P2(x, y0 - ov - r), r); s.Text(new P2(x, y0 - ov - r), xn[i], s.U(TextH), HAlign.Center, VAlign.Middle); }
-                if (Top) { s.Circle(new P2(x, y1 + ov + r), r); s.Text(new P2(x, y1 + ov + r), xn[i], s.U(TextH), HAlign.Center, VAlign.Middle); }
+                if (Bottom) { s.Circle(new P2(x, y0 - ov - r), r); s.Text(new P2(x, y0 - ov - r), xn[i], s.U(MarkH), HAlign.Center, VAlign.Middle); }
+                if (Top) { s.Circle(new P2(x, y1 + ov + r), r); s.Text(new P2(x, y1 + ov + r), xn[i], s.U(MarkH), HAlign.Center, VAlign.Middle); }
             }
             for (int i = 0; i < ys.Count; i++)
             {
                 var y = ys[i];
                 Dash.DashDot(s, new P2(Left ? x0 - ov : x0 - s.U(5), y), new P2(Right ? x1 + ov : x1 + s.U(5), y));
-                if (Left) { s.Circle(new P2(x0 - ov - r, y), r); s.Text(new P2(x0 - ov - r, y), yn[i], s.U(TextH), HAlign.Center, VAlign.Middle); }
-                if (Right) { s.Circle(new P2(x1 + ov + r, y), r); s.Text(new P2(x1 + ov + r, y), yn[i], s.U(TextH), HAlign.Center, VAlign.Middle); }
+                if (Left) { s.Circle(new P2(x0 - ov - r, y), r); s.Text(new P2(x0 - ov - r, y), yn[i], s.U(MarkH), HAlign.Center, VAlign.Middle); }
+                if (Right) { s.Circle(new P2(x1 + ov + r, y), r); s.Text(new P2(x1 + ov + r, y), yn[i], s.U(MarkH), HAlign.Center, VAlign.Middle); }
             }
             if (!Dimensions) return;
             // Цепочки: шаги — ближе к осям, общий размер — дальше; засечки 45° (ГОСТ 2.307 для строительных чертежей).
@@ -409,7 +413,7 @@ namespace Slt.Core
             for (int i = 1; i < pts.Count; i++)
             {
                 var a = pts[i - 1]; var b = pts[i];
-                var v = horizontal ? Math.Abs(b.X - a.X) : Math.Abs(b.Y - a.Y);
+                var v = (horizontal ? Math.Abs(b.X - a.X) : Math.Abs(b.Y - a.Y)) / (Units > 0 ? Units : 1);
                 var txt = Math.Round(v).ToString(CultureInfo.InvariantCulture);
                 var m = (a + b) * 0.5;
                 if (horizontal) s.Text(m + new P2(0, s.U(0.8)), txt, s.U(2.5), HAlign.Center, VAlign.Bottom);
@@ -417,19 +421,60 @@ namespace Slt.Core
             }
         }
 
-        public override IList<P2> Grips() => new[] { new P2(0, 0) };
-        public override P2 MoveGrip(int i, P2 to) => to;
+        // Ручки: 0 — пересечение первых осей (перенос), дальше — каждая ось по X (на первой оси Y), затем каждая ось по Y:
+        // перетаскивание меняет расстояние до соседних осей, остальные оси остаются на месте.
+        public override IList<P2> Grips()
+        {
+            var xs = Xs(); var ys = Ys();
+            var g = new List<P2> { new P2(0, 0) };
+            for (int i = 1; i < xs.Count; i++) g.Add(new P2(xs[i], 0));
+            for (int j = 1; j < ys.Count; j++) g.Add(new P2(0, ys[j]));
+            return g;
+        }
+
+        public override P2 MoveGrip(int i, P2 to)
+        {
+            if (i == 0) return to;
+            var sx = AxisNames.Spans(XSpans); var sy = AxisNames.Spans(YSpans);
+            if (i <= sx.Count) XSpans = Shift(sx, i, (to.X - Xs()[i]) / Units);
+            else { int j = i - sx.Count; if (j >= 1 && j <= sy.Count) YSpans = Shift(sy, j, (to.Y - Ys()[j]) / Units); }
+            return new P2(0, 0);
+        }
+
+        /// <summary>Сдвиг оси k (1…n) на d: шаг до неё растёт, следующий — уменьшается. Результат — компактно («6000*3,3000»).</summary>
+        static string Shift(List<double> spans, int k, double d)
+        {
+            var min = 1.0;
+            d = Math.Max(d, min - spans[k - 1]);
+            if (k < spans.Count) d = Math.Min(d, spans[k] - min);
+            spans[k - 1] = Math.Round(spans[k - 1] + d);
+            if (k < spans.Count) spans[k] = Math.Round(spans[k] - d);
+            return Compact(spans);
+        }
+
+        public static string Compact(IList<double> spans)
+        {
+            var parts = new List<string>();
+            for (int i = 0; i < spans.Count;)
+            {
+                int j = i; while (j + 1 < spans.Count && Math.Abs(spans[j + 1] - spans[i]) < 1e-9) j++;
+                var v = spans[i].ToString("0.###", CultureInfo.InvariantCulture);
+                parts.Add(j > i ? v + "*" + (j - i + 1) : v);
+                i = j + 1;
+            }
+            return string.Join(", ", parts);
+        }
 
         public override Dictionary<string, string> Save() => new Dictionary<string, string>
         {
-            { "xs", XSpans }, { "ys", YSpans }, { "x1", XFirst }, { "y1", YFirst }, { "b", Bottom ? "1" : "0" }, { "l", Left ? "1" : "0" }, { "t", Top ? "1" : "0" }, { "r", Right ? "1" : "0" },
+            { "u", F(Units) }, { "xs", XSpans }, { "ys", YSpans }, { "x1", XFirst }, { "y1", YFirst }, { "b", Bottom ? "1" : "0" }, { "l", Left ? "1" : "0" }, { "t", Top ? "1" : "0" }, { "r", Right ? "1" : "0" },
             { "dims", Dimensions ? "1" : "0" }, { "ov", F(Overshoot) }, { "d", F(Diameter) }, { "h", F(TextH) },
         };
         public override void Load(IDictionary<string, string> d)
         {
             XSpans = S(d, "xs", "6000*4"); YSpans = S(d, "ys", "6000*3"); XFirst = S(d, "x1", "1"); YFirst = S(d, "y1", "А");
             Bottom = B(d, "b", true); Left = B(d, "l", true); Top = B(d, "t", false); Right = B(d, "r", false);
-            Dimensions = B(d, "dims", true); Overshoot = D(d, "ov", 20); Diameter = D(d, "d", 8); TextH = D(d, "h", 3.5);
+            Dimensions = B(d, "dims", true); Overshoot = D(d, "ov", 20); Diameter = D(d, "d", 8); TextH = D(d, "h", 0); Units = D(d, "u", 1);
         }
     }
 }

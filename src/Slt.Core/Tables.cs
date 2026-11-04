@@ -97,6 +97,8 @@ namespace Slt.Core
     {
         public string Caption = "Кабельный журнал";
         public List<string[]> Rows = new List<string[]>();
+        /// <summary>Заполнять по кабелям чертежа; выкл. — строки вводятся вручную (окно таблицы).</summary>
+        public bool Auto = true;
         public double TextH = 2.5;
         public static readonly double[] Widths = { 25, 45, 45, 70, 15, 30 };
         public static readonly string[] Headers = { "Обозначение кабеля", "Начало", "Конец", "Марка кабеля", "Длина, м", "Примечание" };
@@ -115,8 +117,8 @@ namespace Slt.Core
 
         public override IList<P2> Grips() => new[] { new P2(0, 0) };
         public override P2 MoveGrip(int i, P2 to) => to;
-        public override Dictionary<string, string> Save() { var d = Grid.SaveRows(Rows); d["caption"] = Caption; d["h"] = F(TextH); return d; }
-        public override void Load(IDictionary<string, string> d) { Rows = Grid.LoadRows(d); Caption = S(d, "caption", "Кабельный журнал"); TextH = D(d, "h", 2.5); }
+        public override Dictionary<string, string> Save() { var d = Grid.SaveRows(Rows); d["caption"] = Caption; d["h"] = F(TextH); d["auto"] = Auto ? "1" : "0"; return d; }
+        public override void Load(IDictionary<string, string> d) { Rows = Grid.LoadRows(d); Caption = S(d, "caption", "Кабельный журнал"); TextH = D(d, "h", 2.5); Auto = B(d, "auto", true); }
     }
 
     // ===================== спецификация (ГОСТ 21.110) =====================
@@ -131,6 +133,7 @@ namespace Slt.Core
     {
         public string Caption = "";
         public List<string[]> Rows = new List<string[]>();
+        public bool Auto = true;
         public double TextH = 2.5;
         public static readonly double[] Widths = { 20, 130, 60, 35, 45, 20, 20, 25, 40 };
         public static readonly string[] Headers = { "Поз.", "Наименование и техническая характеристика", "Тип, марка, обозначение документа, опросного листа", "Код продукции", "Поставщик", "Ед. изме-\nрения", "Коли-\nчество", "Масса 1 ед., кг", "Примечание" };
@@ -170,8 +173,8 @@ namespace Slt.Core
 
         public override IList<P2> Grips() => new[] { new P2(0, 0) };
         public override P2 MoveGrip(int i, P2 to) => to;
-        public override Dictionary<string, string> Save() { var d = Grid.SaveRows(Rows); d["caption"] = Caption; d["h"] = F(TextH); return d; }
-        public override void Load(IDictionary<string, string> d) { Rows = Grid.LoadRows(d); Caption = S(d, "caption"); TextH = D(d, "h", 2.5); }
+        public override Dictionary<string, string> Save() { var d = Grid.SaveRows(Rows); d["caption"] = Caption; d["h"] = F(TextH); d["auto"] = Auto ? "1" : "0"; return d; }
+        public override void Load(IDictionary<string, string> d) { Rows = Grid.LoadRows(d); Caption = S(d, "caption"); TextH = D(d, "h", 2.5); Auto = B(d, "auto", true); }
     }
 
     // ===================== таблица ФСА =====================

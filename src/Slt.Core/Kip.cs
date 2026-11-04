@@ -235,6 +235,7 @@ namespace Slt.Core
     {
         public string Caption = "";
         public List<string[]> Rows = new List<string[]>();      // поз., наименование, кол-во
+        public bool Auto = true;
         public double[] Widths = { 20, 85, 15 };
         public double TextH = 2.5;
         public override string Kind => "list";
@@ -325,14 +326,14 @@ namespace Slt.Core
 
         public override Dictionary<string, string> Save()
         {
-            var d = new Dictionary<string, string> { { "caption", Caption }, { "h", F(TextH) }, { "w", string.Join(";", Widths.Select(F)) }, { "n", Rows.Count.ToString(CultureInfo.InvariantCulture) } };
+            var d = new Dictionary<string, string> { { "caption", Caption }, { "h", F(TextH) }, { "w", string.Join(";", Widths.Select(F)) }, { "n", Rows.Count.ToString(CultureInfo.InvariantCulture) }, { "auto", Auto ? "1" : "0" } };
             for (int i = 0; i < Rows.Count; i++) d["r" + i] = string.Join("¦", Rows[i].Select(x => (x ?? "").Replace("¦", "|")));
             return d;
         }
 
         public override void Load(IDictionary<string, string> d)
         {
-            Caption = S(d, "caption"); TextH = D(d, "h", 2.5);
+            Caption = S(d, "caption"); TextH = D(d, "h", 2.5); Auto = B(d, "auto", true);
             var w = S(d, "w").Split(';').Select(x => double.TryParse(x, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : 0).ToArray();
             if (w.Length == 3 && w.All(v => v > 0)) Widths = w;
             int n = (int)D(d, "n", 0);

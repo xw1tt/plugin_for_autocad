@@ -247,7 +247,7 @@ namespace Slt.Acad
                     for (int i = 1; i + 1 < s.Pts.Length; i++) yield return new Solid(P(s.Pts[0]), P(s.Pts[i]), P(s.Pts[i + 1]));
                     break;
                 case ShapeKind.Text:
-                    var t = new DBText { TextString = s.Text, Height = s.H, Rotation = s.Rotation };
+                    var t = new DBText { TextString = s.Text, Height = s.H, Rotation = s.Rotation, WidthFactor = s.WidthFactor > 0 ? s.WidthFactor : 1 };
                     if (!style.IsNull) t.TextStyleId = style;
                     var at = P(s.Pts[0]);
                     if (s.Ha == HAlign.Left && s.Va == VAlign.Bottom) t.Position = at;

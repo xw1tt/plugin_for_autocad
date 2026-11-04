@@ -126,9 +126,22 @@ Eq("длина по чертежу, м", 7.0, cb.Length(1));
 cb.Reserve = 10; Eq("с запасом 10% вверх до метра", 8.0, cb.Length(1));
 cb.Meters = 12; Eq("вручную", 12.0, cb.Length(1));
 Eq("на листе без ручной — 0", 0.0, new Cable().Length(0));
-var dashed = new Cable { Line = "pwr", ShowMark = false, Path = new List<P2> { new P2(0, 0), new P2(100, 0) } };
+var errs = new List<string>();
+Eq("встроенные виды линий", "open,pipe,corr,tray,box,hose", string.Join(",", LineKinds.Parse(LineKinds.DefaultText(), "t", errs).Select(k => k.Id)));
+Eq("виды без ошибок", 0, errs.Count);
+var kinds = LineKinds.Parse(LineKinds.DefaultText(), "t", errs);
+LineKinds.Parse("= tray | Лоток свой | 1 | | 8 2 | 0\n= sig | Сигнальная | 3 | | | 0", "u", errs, kinds);
+LineKinds.Current = kinds;
+Eq("замена по id", "Лоток свой", LineKinds.Get("tray").Name);
+Eq("свой вид добавлен", 7, kinds.Count);
+var dashed = new Cable { Line = "tray", ShowMark = false, Path = new List<P2> { new P2(0, 0), new P2(100, 0) } };
 True("штриховая — много отрезков", dashed.Shapes().Count(x => x.Kind == ShapeKind.Line) >= 8);
-True("Ethernet — красный", new Cable { Line = "eth" }.Shapes().First().Color == 1);
+True("свой цвет", dashed.Shapes().First().Color == 1);
+LineKinds.Current = LineKinds.Parse(LineKinds.DefaultText(), "t", errs);
+var piped = new Cable { Line = "pipe", ShowMark = false, Path = new List<P2> { new P2(0, 0), new P2(100, 0) } };
+Eq("знаки трубы через 25 мм", 4, piped.Shapes().Count(x => x.Kind == ShapeKind.Circle));
+var bent = new Cable { Line = "box", ShowMark = false, Path = new List<P2> { new P2(0, 0), new P2(10, 0), new P2(10, 10) } };
+Eq("короткие участки — знак посередине", 2, bent.Shapes().Count(x => x.Kind == ShapeKind.Polyline && x.Closed));
 var lbl = new Cable { Mark = "К5", Path = new List<P2> { new P2(0, 0), new P2(-50, 0) } }.Shapes().First(x => x.Kind == ShapeKind.Text);
 Eq("подпись не вверх ногами", 0.0, Math.Round(lbl.Rotation, 6));
 foreach (var kind in new[] { "cable", "journal", "spec", "fsa", "legend" })
@@ -166,6 +179,36 @@ Eq("ссылка ИМ 3,7→2,4", "2,4", k2.Ref);
 True("ИМ — управление", ft.Columns[1].Marks.Contains("Управление"));
 var fb = (FsaTable)Smart.From(ft.SaveAll());
 Eq("ФСА сохраняет графы", "1|a|2|Привод|3|b|4|Привод", string.Join("|", fb.Columns.Select(c => c.Num + "|" + c.Text)));
+
+// Оси: ручки меняют расстояние между соседними осями
+var ag = new AxisGrid { XSpans = "6000*3", YSpans = "6000" };
+Eq("ручек осей", 1 + 3 + 1, ag.Grips().Count);
+ag.MoveGrip(2, new P2(13000, 0));
+Eq("ось 3 сдвинута", "6000, 7000, 5000", ag.XSpans);
+ag.MoveGrip(3, new P2(20000, 0));
+Eq("крайняя ось — только её шаг", "6000, 7000*2", ag.XSpans);
+Eq("компактно", "6000*3, 3000", AxisGrid.Compact(new List<double> { 6000, 6000, 6000, 3000 }));
+var agm = new AxisGrid { XSpans = "6000", YSpans = "6000", Units = 0.001 };
+Eq("чертёж в метрах", 6.0, agm.Xs()[1]);
+True("марка растёт с кружком", new AxisGrid { Diameter = 30 }.Shapes().Where(x => x.Kind == ShapeKind.Text && x.Text == "1").All(x => x.H > 10));
+
+// Штамп: свои должности, подписи одной высоты
+var sf = new SheetFormat(); sf.Fields["r1"] = "Главный инженер проекта"; sf.Fields["n1"] = "Константинопольский";
+var stx = sf.Shapes().Where(x => x.Kind == ShapeKind.Text).ToList();
+True("своя должность", stx.Any(x => x.Text == "Главный инженер проекта"));
+Eq("подписи — 2,5", 2.5, stx.First(x => x.Text == "Главный инженер проекта").H);
+Eq("фамилия — 2,5", 2.5, stx.First(x => x.Text == "Константинопольский").H);
+True("длинное — сжато по ширине", stx.First(x => x.Text == "Главный инженер проекта").WidthFactor < 1);
+var cap = stx.First(x => x.Text.StartsWith("Формат"));
+True("«Формат» над краем листа", cap.Va == VAlign.Bottom && cap.Pts[0].Y > 0.5);
+var nums = new List<SheetFormat> { new SheetFormat(), new SheetFormat { Stamp = StampForm.Form6 } };
+SheetFormat.Number(nums, 5);
+Eq("с 5-го", "6", nums[1].Field("sheet")); Eq("листов с учётом начала", "6", nums[0].Field("sheets"));
+
+// Ручные таблицы
+var mj = new Journal { Auto = false, Rows = new List<string[]> { new[] { "К1", "ШУ", "Д1", "UTP", "10", "" } } };
+var mjb = (Journal)Smart.From(mj.SaveAll());
+True("ручной журнал сохраняется", !mjb.Auto && mjb.Rows[0][3] == "UTP");
 
 Console.WriteLine($"Проверок: {total}, провалено: {fails}");
 return fails == 0 ? 0 : 1;

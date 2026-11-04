@@ -33,7 +33,7 @@ namespace Slt.Core
                         var p = s.Pts[0];
                         var anchor = s.Ha == HAlign.Left ? "start" : s.Ha == HAlign.Center ? "middle" : "end";
                         var dy = s.Va == VAlign.Bottom ? 0 : s.Va == VAlign.Middle ? s.H / 2 : s.H;
-                        sb.Append($"<text transform=\"translate({F(p.X)} {F(p.Y)}) rotate({F(s.Rotation * 180 / Math.PI)}) scale(1 -1)\" y=\"{F(dy)}\" font-size=\"{F(s.H * 1.25)}\" font-family=\"ISOCPEUR, 'Liberation Sans Narrow', 'Arial Narrow', Arial\" textLength=\"{F(TextMeasure.Width(s.Text, s.H))}\" lengthAdjust=\"spacingAndGlyphs\" font-style=\"italic\" text-anchor=\"{anchor}\" fill=\"#000\" stroke=\"none\">{System.Security.SecurityElement.Escape(s.Text)}</text>");
+                        sb.Append($"<text transform=\"translate({F(p.X)} {F(p.Y)}) rotate({F(s.Rotation * 180 / Math.PI)}) scale(1 -1)\" y=\"{F(dy)}\" font-size=\"{F(s.H * 1.25)}\" font-family=\"ISOCPEUR, 'Liberation Sans Narrow', 'Arial Narrow', Arial\" textLength=\"{F(TextMeasure.Width(s.Text, s.H) * s.WidthFactor)}\" lengthAdjust=\"spacingAndGlyphs\" font-style=\"italic\" text-anchor=\"{anchor}\" fill=\"#000\" stroke=\"none\">{System.Security.SecurityElement.Escape(s.Text)}</text>");
                         break;
                 }
                 if (s.Color != 0) sb.Append("</g>");
