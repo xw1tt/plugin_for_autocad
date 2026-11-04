@@ -139,14 +139,14 @@ True("штриховая — много отрезков", dashed.Shapes().Count
 True("свой цвет", dashed.Shapes().First().Color == 1);
 LineKinds.Current = LineKinds.Parse(LineKinds.DefaultText(), "t", errs);
 var piped = new Cable { Line = "pipe", ShowMark = false, Path = new List<P2> { new P2(0, 0), new P2(100, 0) } };
-Eq("знаки трубы через 35 мм", 3, piped.Shapes().Count(x => x.Kind == ShapeKind.Circle));
-Eq("линия трубы с разрывами", 4, piped.Shapes().Count(x => x.Kind == ShapeKind.Polyline && x.Pts.Length == 2 && Math.Abs(x.Pts[0].Y) < 1e-9 && Math.Abs(x.Pts[1].Y) < 1e-9));
+Eq("гладкая: кружки через 25 мм", 4, piped.Shapes().Count(x => x.Kind == ShapeKind.Circle));
+var corrd = new Cable { Line = "corr", ShowMark = false, Path = new List<P2> { new P2(0, 0), new P2(100, 0) } };
+Eq("гофра: линия с разрывами", 4, corrd.Shapes().Count(x => x.Kind == ShapeKind.Polyline && x.Pts.Length == 2 && Math.Abs(x.Pts[0].Y) < 1e-9 && Math.Abs(x.Pts[1].Y) < 1e-9));
 var pieces = LineKinds.Split(new List<P2> { new P2(0, 0), new P2(10, 0), new P2(10, 10) }, new List<double[]> { new[] { 8.0, 12.0 } });
 Eq("разрыв через вершину", "2", pieces.Count.ToString());
 Eq("конец первого куска", "(8; 0)", pieces[0].Last().ToString());
 Eq("начало второго", "(10; 2)", pieces[1][0].ToString());
-var waved = new Cable { Line = "corr", ShowMark = false, Path = new List<P2> { new P2(0, 0), new P2(100, 0) } };
-Eq("гофра: линия сплошная + 3 волны × 3 знака", 1 + 9, waved.Shapes().Count(x => x.Kind == ShapeKind.Polyline));
+Eq("гофра: кружки через 35 мм", 3, corrd.Shapes().Count(x => x.Kind == ShapeKind.Circle));
 var bent = new Cable { Line = "box", ShowMark = false, Path = new List<P2> { new P2(0, 0), new P2(10, 0), new P2(10, 10) } };
 Eq("короткие участки — знак посередине", 2, bent.Shapes().Count(x => x.Kind == ShapeKind.Polyline && x.Closed));
 var lbl = new Cable { Mark = "К5", Path = new List<P2> { new P2(0, 0), new P2(-50, 0) } }.Shapes().First(x => x.Kind == ShapeKind.Text);
